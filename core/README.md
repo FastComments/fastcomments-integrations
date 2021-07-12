@@ -9,6 +9,14 @@ into your project.
 
 ## Integration Protocol
 
+The protocol uses a `polling` mechanism as opposed to having FastComments `push` the events to the client.
+
+This is to reduce friction on setup, as this way firewalls and DDOS prevention tools are much less of a concern. The first
+version of this framework was `push-based` to lesson the load on our servers, but it created a lot of signup friction
+as it would mean that we have to be able to reach your backend.
+
+This way, you only have to be able to reach us!
+
 ### Considerations - Use Cases
 
 Your integration needs to be able to handle:
