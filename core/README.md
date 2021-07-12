@@ -68,3 +68,8 @@ The event log response will return the following events:
 - `deleted-comment`
 - `new-vote`
 - `deleted-vote`
+
+### Testing
+
+All core integration libraries must have integration tests to be merged to master. These tests should consume
+the library just like a plugin would, and do steps 1 - 4 as outlined above.
