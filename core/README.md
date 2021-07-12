@@ -42,6 +42,10 @@ Once the token has been validated, the integration should periodically poll the 
 
 This will return you a JSON object with two lists: `commands` and `events`.
 
+For most integrations, you should poll this API continuously (every few seconds) until you receive the SetSetupCompleted event.
+
+After that, once a day is sufficient.
+
 If you have any events, you should process them. An event may be a new or deleted comment, or maybe a vote applied to a comment.
 
 For commands, see the next section.
