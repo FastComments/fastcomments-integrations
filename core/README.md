@@ -34,17 +34,25 @@ If you have any events, you should process them. An event may be a new or delete
 
 For commands, see the next section.
 
-### Integrations - Commands
+### Protocol - Commands
 
 The command stream specifies commands to the client. Supported commands:
 
-- `SetSetupCompleted` - Set the setup completed (For example, don't show the setup progress screen anymore).
+- `SetSetupCompleted` - Set the setup completed (For example, don't show the setup progress screen anymore). The server will send this when the token is validated and the initial sync is done.
 - `SendNextCommentsPayload` - Send the next batch of comments. This is mostly used for initial migrations, but could also be used to re-sync.
 
-### Integrations - Upstream Sync
+### Protocol - Upstream Sync
 
 When the client receives a `SendNextCommentsPayload` command, it should look at the details of this command to determine
 what the next set of comments are to sync. This command should define `start` and `count` parameters so the client can paginate
 the next set of results and send them to `POST https://fastcomments.com/integrations/v1/comments`. 
 
-### Integrations - Event Log
+### Protocol - Event Log
+
+The event log response will return the following events:
+
+- `new-comment`
+- `updated-comment`
+- `deleted-comment`
+- `new-vote`
+- `deleted-vote`
