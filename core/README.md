@@ -2,6 +2,10 @@
 
 FastComments provides a set of conventions, patterns, and libraries for building integrations.
 
+These libraries are *not* a replacement for the FastComments API. If you just want to use the API, see here: [https://docs.fastcomments.com/guide-api.html](https://docs.fastcomments.com/guide-api.html).
+
+Rather, these core libraries are for building third party plugins that interact with FastComments.
+
 ### Using The Library
 
 For example, if you are building a Drupal or WordPress plugin, you should **statically link** the `php` folder
