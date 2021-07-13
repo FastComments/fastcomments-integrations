@@ -1,0 +1,6 @@
+{
+  "name": "fastcomments-integration-core-example",
+  "dependencies": {
+    "axios": "^0.21.1"
+  }
+}
