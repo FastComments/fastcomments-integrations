@@ -12,7 +12,7 @@ For example, if you are building a Drupal or WordPress plugin, you should **stat
 into your project.
 
 ## Integration Protocol
-
+token
 The protocol uses a `polling` mechanism as opposed to having FastComments `push` the events to the client.
 
 This is to reduce friction on setup, as this way firewalls and DDOS prevention tools are much less of a concern. The first
@@ -32,7 +32,7 @@ Your integration needs to be able to handle:
 
 ### Integration Flow - Initial Setup
 
-For the initial setup your integration be able to send the following HTTPs request: `PUT https://fastcomments.com/integrations/v1/token/<token uuid>`.
+For the initial setup your integration be able to send the following HTTPs request: `PUT https://fastcomments.com/integrations/v1/token?token=<token uuid>`.
 
 It is expected to do this repeatedly until the user acknowledges the integration (and thus your token will be accepted, and this API will return a success response).
 
