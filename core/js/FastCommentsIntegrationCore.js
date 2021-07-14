@@ -315,11 +315,11 @@ export default class FastCommentsIntegrationCore {
                         case 'FetchEvents':
                             // paginate until we don't get any more events
                             // log "fetched x comments"
-                            // limit us to fetching 5k this round, then set fastcomments_stream_last_fetch_date to the last comment date
+                            // limit us to fetching for 30 seconds, then set fastcomments_stream_last_fetch_date to the last comment date found
                             await this.setSettingValue('fastcomments_stream_last_fetch_date', now);
                             break;
                         case 'SendComments':
-                            // limit us to sending 5k this round, maintaining last_comment_sent_timestamp with each send
+                            // limit us to sending for 30 seconds, maintaining last_comment_sent_timestamp with each send
                             // log "sending x comments"
                             // if no more comments:
                             //  pass "hasMore = false", and the server should stop telling us SendComments
