@@ -117,11 +117,19 @@ export default class FastCommentsIntegrationCore {
     }
 
     /**
-     * Create a UUID. Implement using the UUID library of your choice.
+     * @description Create a UUID. Implement using the UUID library of your choice.
      * @return {string}
      */
     createUUID() {
         throw new Error('Implement me! createUUID');
+    }
+
+    /**
+     * @description Get the domain name the integration is running on (like myawesomeblog.com).
+     * @return {Promise<string>}
+     */
+    async getDomain() {
+        throw new Error('Implement me! getDomain');
     }
 
     /**
@@ -287,7 +295,8 @@ export default class FastCommentsIntegrationCore {
     async integrationStateValidateToken() {
         const token = await this.getSettingValue('fastcomments_token');
         if (token) {
-            const rawTokenUpsertResponse = await this.makeHTTPRequest('PUT', `${this.baseUrl}/token?token=${token}&integrationType=${this.integrationType}`);
+            const domainName = await this.getDomain();
+            const rawTokenUpsertResponse = await this.makeHTTPRequest('PUT', `${this.baseUrl}/token?token=${token}&integrationType=${this.integrationType}&domain=${domainName}`);
             /** @type {FastCommentsTokenUpsertResponse} **/
             const tokenUpsertResponse = JSON.parse(rawTokenUpsertResponse.responseBody);
             if (tokenUpsertResponse.status === 'success' && tokenUpsertResponse.isTokenValidated === true) {
@@ -329,12 +338,15 @@ export default class FastCommentsIntegrationCore {
                                 /** @type {FastCommentsEventStreamResponse} **/
                                 const response = JSON.parse(rawIntegrationEventsResponse.responseBody);
                                 if (response.status === 'success') {
-                                    this.log('error', `Got events count: ${response.events.length}`);
-                                    await this.handleEvents(response.events);
+                                    this.log('info', `Got events count: ${response.events.length}`);
                                     if (response.events && response.events.length > 0) {
+                                        await this.handleEvents(response.events);
                                         fromDateTime = response.events[response.events.length - 1].createdAt;
                                         await this.setSettingValue('fastcomments_stream_last_fetch_date', fromDateTime);
+                                    } else {
+                                        break;
                                     }
+                                    hasMore = response.hasMore;
                                 } else {
                                     this.log('error', `Failed to get events: ${rawIntegrationEventsResponse}`);
                                     break;
