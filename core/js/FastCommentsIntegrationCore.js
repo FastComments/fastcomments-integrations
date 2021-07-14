@@ -85,6 +85,7 @@
  * @typedef {Object} FastCommentsEventStreamResponse
  * @property {'success'|'failure'} status
  * @property {Array.<FastCommentsEventStreamItem>} [events]
+ * @property {boolean} hasMore
  */
 
 export default class FastCommentsIntegrationCore {
@@ -189,6 +190,14 @@ export default class FastCommentsIntegrationCore {
      */
     async getLogoutURL() {
         throw new Error('Implement me! getLogoutURL');
+    }
+
+    /**
+     * @param {Array.<FastCommentsEventStreamItem>} events
+     * @return {Promise<void>}
+     */
+    async handleEvents(events) {
+        throw new Error('Implement me! handleEvents');
     }
 
     /**
@@ -303,7 +312,6 @@ export default class FastCommentsIntegrationCore {
             this.getSettingValue('fastcomments_token'),
             this.getSettingValue('fastcomments_stream_last_fetch_date')
         ]);
-        const now = Date.now();
         const rawIntegrationStreamResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/commands?token=${token}&lastFetchDate=${lastFetchDate}`);
         this.log('debug', 'Stream response status: ' + rawIntegrationStreamResponse.responseStatus);
         if (rawIntegrationStreamResponse.responseStatus === 200) {
@@ -313,10 +321,25 @@ export default class FastCommentsIntegrationCore {
                 for (const command of response.commands) {
                     switch (command.command) {
                         case 'FetchEvents':
-                            // paginate until we don't get any more events
-                            // log "fetched x comments"
-                            // limit us to fetching for 30 seconds, then set fastcomments_stream_last_fetch_date to the last comment date found
-                            await this.setSettingValue('fastcomments_stream_last_fetch_date', now);
+                            let startFromDate = lastFetchDate;
+                            let hasMore = true;
+                            const startedAt = Date.now();
+                            while(hasMore && Date.now() - startedAt < 30 * 1000) {
+                                const rawIntegrationEventsResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/events?token=${token}&startFromDate=${startFromDate}`);
+                                /** @type {FastCommentsEventStreamResponse} **/
+                                const response = JSON.parse(rawIntegrationEventsResponse.responseBody);
+                                if (response.status === 'success') {
+                                    this.log('error', `Got events count: ${response.events.length}`);
+                                    await this.handleEvents(response.events);
+                                    if (response.events && response.events.length > 0) {
+                                        startFromDate = response.events[response.events.length - 1].createdAt;
+                                        await this.setSettingValue('fastcomments_stream_last_fetch_date', startFromDate);
+                                    }
+                                } else {
+                                    this.log('error', `Failed to get events: ${rawIntegrationEventsResponse}`);
+                                    break;
+                                }
+                            }
                             break;
                         case 'SendComments':
                             // limit us to sending for 30 seconds, maintaining last_comment_sent_timestamp with each send
@@ -324,6 +347,7 @@ export default class FastCommentsIntegrationCore {
                             // if no more comments:
                             //  pass "hasMore = false", and the server should stop telling us SendComments
                             //  await this.setSettingValue('fastcomments_stream_last_fetch_date', now);
+                            // tell server
                             // else
                             break;
                     }
