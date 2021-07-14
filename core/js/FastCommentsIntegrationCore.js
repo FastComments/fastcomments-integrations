@@ -321,19 +321,19 @@ export default class FastCommentsIntegrationCore {
                 for (const command of response.commands) {
                     switch (command.command) {
                         case 'FetchEvents':
-                            let startFromDate = lastFetchDate;
+                            let fromDateTime = lastFetchDate;
                             let hasMore = true;
                             const startedAt = Date.now();
                             while(hasMore && Date.now() - startedAt < 30 * 1000) {
-                                const rawIntegrationEventsResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/events?token=${token}&startFromDate=${startFromDate}`);
+                                const rawIntegrationEventsResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/events?token=${token}&fromDateTime=${fromDateTime}`);
                                 /** @type {FastCommentsEventStreamResponse} **/
                                 const response = JSON.parse(rawIntegrationEventsResponse.responseBody);
                                 if (response.status === 'success') {
                                     this.log('error', `Got events count: ${response.events.length}`);
                                     await this.handleEvents(response.events);
                                     if (response.events && response.events.length > 0) {
-                                        startFromDate = response.events[response.events.length - 1].createdAt;
-                                        await this.setSettingValue('fastcomments_stream_last_fetch_date', startFromDate);
+                                        fromDateTime = response.events[response.events.length - 1].createdAt;
+                                        await this.setSettingValue('fastcomments_stream_last_fetch_date', fromDateTime);
                                     }
                                 } else {
                                     this.log('error', `Failed to get events: ${rawIntegrationEventsResponse}`);
