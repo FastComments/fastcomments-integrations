@@ -8,18 +8,83 @@
  */
 
 /**
- * @typedef {Object} FastCommentsStreamEvent
+ * @typedef {Object} FastCommentsCommandStreamItem
+ * @property {string|null} id - null for SYNC commands
+ * @property {'SendComments', 'FetchEvents'} command - Which command to run.
+ * @property {number} [eventCount] - For Sync commands, the number of events waiting.
  */
 
 /**
- * @typedef {Object} FastCommentsStreamCommand
- */
-
-/**
- * @typedef {Object} FastCommentsStreamResponse
+ * @typedef {Object} FastCommentsCommandStreamResponse
  * @property {'success'|'failure'} status
- * @property {Array.<FastCommentsStreamEvent>} [events]
- * @property {Array.<FastCommentsStreamCommand>} [commands]
+ * @property {Array.<FastCommentsCommandStreamItem>} [commands]
+ */
+
+/**
+ * @typedef {Object} FastCommentsEventStreamDataComment
+ * @property {string} _id
+ * @property {string} tenantId
+ * @property {string} urlId
+ * @property {string} urlIdRaw
+ * @property {string} url
+ * @property {string} pageTitle
+ * @property {string} userId
+ * @property {string} commenterName
+ * @property {string} commenterEmail
+ * @property {string} comment
+ * @property {string} commentHTML
+ * @property {string} parentId
+ * @property {string} date
+ * @property {number} votes
+ * @property {number} votesUp
+ * @property {number} votesDown
+ * @property {boolean} verified
+ * @property {boolean} notificationSentForParent
+ * @property {boolean} notificationSentForParentTenant
+ * @property {boolean} reviewed
+ * @property {string} avatarSrc
+ * @property {boolean} isSpam
+ * @property {boolean} aiDeterminedSpam
+ * @property {boolean} hasImages
+ * @property {boolean} hasLinks
+ * @property {boolean} approved
+ * @property {string} locale
+ * @property {boolean} isByAdmin
+ * @property {boolean} isByModerator
+ */
+
+/**
+ * @typedef {Object} FastCommentsEventStreamDataVote
+ * @property {string} _id
+ * @property {string} tenantId
+ * @property {string} urlId
+ * @property {string} urlIdRaw
+ * @property {string} commentId
+ * @property {string} userId
+ * @property {number} direction - -1 for down, 1 for up
+ * @property {number} createdAt - milliseconds
+ */
+
+/**
+ * @typedef {Object} FastCommentsEventStreamItemData
+ * @property {'new-comment'|'updated-comment'|'deleted-comment'|'new-vote'|'deleted-vote'} type
+ * @property {string} broadcastId
+ * @property {number} timestamp
+ * @property {FastCommentsEventStreamDataComment} [comment]
+ * @property {FastCommentsEventStreamDataVote} [vote]
+ */
+
+/**
+ * @typedef {Object} FastCommentsEventStreamItem
+ * @property {string} createdAt
+ * @property {string} urlId
+ * @property {string} data - json data payload (FastCommentsEventStreamItemData)
+ */
+
+/**
+ * @typedef {Object} FastCommentsEventStreamResponse
+ * @property {'success'|'failure'} status
+ * @property {Array.<FastCommentsEventStreamItem>} [events]
  */
 
 export default class FastCommentsIntegrationCore {
@@ -61,7 +126,7 @@ export default class FastCommentsIntegrationCore {
     /**
      *
      * @param {string} settingName
-     * @return {Promise<string|boolean|null|undefined>}
+     * @return {Promise<string|number|boolean|null|undefined>}
      */
     async getSettingValue(settingName) {
         throw new Error('Implement me! getSettingValue');
@@ -70,7 +135,7 @@ export default class FastCommentsIntegrationCore {
     /**
      *
      * @param {*} settingName
-     * @param {string|boolean|null|undefined} settingValue
+     * @param {string|number|boolean|null|undefined} settingValue
      * @return {Promise<void>}
      */
     async setSettingValue(settingName, settingValue) {
@@ -190,7 +255,7 @@ export default class FastCommentsIntegrationCore {
      */
     async tick() {
         let nextStateMachine = this.integrationStateInitial;
-        while(nextStateMachine) {
+        while (nextStateMachine) {
             this.log('debug', 'Next state machine:' + nextStateMachine.name);
             nextStateMachine = await nextStateMachine();
         }
@@ -234,21 +299,34 @@ export default class FastCommentsIntegrationCore {
     }
 
     async integrationStatePollNext() {
-        const [ token, lastFetchDate ] = await Promise.all([
+        const [token, lastFetchDate] = await Promise.all([
             this.getSettingValue('fastcomments_token'),
             this.getSettingValue('fastcomments_stream_last_fetch_date')
         ]);
-        const rawIntegrationStreamResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/stream?token=${token}&lastFetchDate=${lastFetchDate}`);
+        const now = Date.now();
+        const rawIntegrationStreamResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/commands?token=${token}&lastFetchDate=${lastFetchDate}`);
         this.log('debug', 'Stream response status: ' + rawIntegrationStreamResponse.responseStatus);
         if (rawIntegrationStreamResponse.responseStatus === 200) {
-            /** @type {FastCommentsStreamResponse} **/
+            /** @type {FastCommentsCommandStreamResponse} **/
             const response = JSON.parse(rawIntegrationStreamResponse.responseBody);
-            if (response.status === 'success') {
-                if (response.commands) {
-                    // TODO
-                }
-                if (response.events) {
-                    // TODO
+            if (response.status === 'success' && response.commands) {
+                for (const command of response.commands) {
+                    switch (command.command) {
+                        case 'FetchEvents':
+                            // paginate until we don't get any more events
+                            // log "fetched x comments"
+                            // limit us to fetching 5k this round, then set fastcomments_stream_last_fetch_date to the last comment date
+                            await this.setSettingValue('fastcomments_stream_last_fetch_date', now);
+                            break;
+                        case 'SendComments':
+                            // limit us to sending 5k this round, maintaining last_comment_sent_timestamp with each send
+                            // log "sending x comments"
+                            // if no more comments:
+                            //  pass "hasMore = false", and the server should stop telling us SendComments
+                            //  await this.setSettingValue('fastcomments_stream_last_fetch_date', now);
+                            // else
+                            break;
+                    }
                 }
             }
         }

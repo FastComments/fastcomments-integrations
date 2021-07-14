@@ -54,8 +54,8 @@ For commands, see the next section.
 
 The command stream specifies commands to the client. Supported commands:
 
-- `SetSetupCompleted` - Set the setup completed (For example, don't show the setup progress screen anymore). The server will send this when the token is validated and the initial sync is done.
-- `SendNextCommentsPayload` - Send the next batch of comments. This is mostly used for initial migrations, but could also be used to re-sync.
+- `SendComments` - Send the next batch of comments. This is mostly used for initial migrations, but could also be used to re-sync.
+- `FetchEvents` - Paginate through the next set of events and apply them locally.
 
 Upon acknowledging a command, the integration should `POST https://fastcomments.com/integrations/v1/ack-command` with the `commandId` and `commandType` in the request body.
 
