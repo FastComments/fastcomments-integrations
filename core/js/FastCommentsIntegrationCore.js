@@ -23,6 +23,7 @@
 /**
  * @typedef {Object} FastCommentsEventStreamDataComment
  * @property {string} _id
+ * @property {string} externalId
  * @property {string} tenantId
  * @property {string} urlId
  * @property {string} urlIdRaw
@@ -56,6 +57,7 @@
 /**
  * @typedef {Object} FastCommentsEventStreamDataVote
  * @property {string} _id
+ * @property {string} commentExternalId
  * @property {string} tenantId
  * @property {string} urlId
  * @property {string} urlIdRaw
@@ -88,13 +90,24 @@
  * @property {boolean} hasMore
  */
 
-export default class FastCommentsIntegrationCore {
-    constructor(integrationType, baseUrl = 'https://fastcomments.com/integrations/v1/') {
+class FastCommentsIntegrationCore {
+    constructor(integrationType, host = 'https://fastcomments.com') {
         if (!integrationType) {
             throw new Error('An integration type is required! Ex: new FastCommentsIntegrationCore("wordpress")');
         }
+        if (!host) {
+            throw new Error('An integration host is required! A valid default is available, did you try to set this to a weird value?');
+        }
         this.integrationType = integrationType;
-        this.baseUrl = baseUrl;
+        this.baseUrl = `${host}/integrations/v1`;
+    }
+
+    /**
+     * @description Activate the integration. Create a table, for example.
+     * @return {string}
+     */
+    async activate() {
+        throw new Error('Implement me! activate()');
     }
 
     /**
@@ -121,7 +134,7 @@ export default class FastCommentsIntegrationCore {
      * @return {string}
      */
     createUUID() {
-        throw new Error('Implement me! createUUID');
+        throw new Error('Implement me! createUUID()');
     }
 
     /**
@@ -129,7 +142,7 @@ export default class FastCommentsIntegrationCore {
      * @return {Promise<string>}
      */
     async getDomain() {
-        throw new Error('Implement me! getDomain');
+        throw new Error('Implement me! getDomain()');
     }
 
     /**
@@ -138,7 +151,7 @@ export default class FastCommentsIntegrationCore {
      * @return {Promise<string|number|boolean|null|undefined>}
      */
     async getSettingValue(settingName) {
-        throw new Error('Implement me! getSettingValue');
+        throw new Error('Implement me! getSettingValue()');
     }
 
     /**
@@ -148,7 +161,7 @@ export default class FastCommentsIntegrationCore {
      * @return {Promise<void>}
      */
     async setSettingValue(settingName, settingValue) {
-        throw new Error('Implement me! setSettingValue');
+        throw new Error('Implement me! setSettingValue()');
     }
 
     /**
@@ -165,7 +178,7 @@ export default class FastCommentsIntegrationCore {
      * @return {Promise<HTTPResponse>}
      */
     async makeHTTPRequest(method, url, body) {
-        throw new Error('Implement me! makeHTTPRequest');
+        throw new Error('Implement me! makeHTTPRequest()');
     }
 
     /**
@@ -181,7 +194,7 @@ export default class FastCommentsIntegrationCore {
      * @return {Promise<User>}
      */
     async getCurrentUser() {
-        throw new Error('Implement me! makeHTTPRequest');
+        throw new Error('Implement me! makeHTTPRequest()');
     }
 
     /**
@@ -189,7 +202,7 @@ export default class FastCommentsIntegrationCore {
      * @return {Promise<string>}
      */
     async getLoginURL() {
-        throw new Error('Implement me! getLoginURL');
+        throw new Error('Implement me! getLoginURL()');
     }
 
     /**
@@ -197,7 +210,7 @@ export default class FastCommentsIntegrationCore {
      * @return {Promise<string>}
      */
     async getLogoutURL() {
-        throw new Error('Implement me! getLogoutURL');
+        throw new Error('Implement me! getLogoutURL()');
     }
 
     /**
@@ -205,7 +218,30 @@ export default class FastCommentsIntegrationCore {
      * @return {Promise<void>}
      */
     async handleEvents(events) {
-        throw new Error('Implement me! handleEvents');
+        throw new Error('Implement me! handleEvents()');
+    }
+
+    /**
+     * @typedef {Object} GetCommentsResponse
+     * @property {'success'|'failure'} status
+     * @property {Array.<FastCommentsEventStreamDataComment>} comments
+     * @property {boolean} hasMore
+     */
+
+    /**
+     * @return {Promise<number>}
+     */
+    async getCommentCount() {
+        throw new Error('Implement me! getCommentCount()');
+    }
+
+    /**
+     * @param {number} startFromDateTime
+     * @param {number} skip
+     * @return {Promise<GetCommentsResponse>}
+     */
+    async getComments(startFromDateTime, skip) {
+        throw new Error('Implement me! getComments()');
     }
 
     /**
@@ -274,7 +310,7 @@ export default class FastCommentsIntegrationCore {
         let nextStateMachine = this.integrationStateInitial;
         while (nextStateMachine) {
             this.log('debug', 'Next state machine:' + nextStateMachine.name);
-            nextStateMachine = await nextStateMachine();
+            nextStateMachine = await nextStateMachine.call(this);
         }
     }
 
@@ -298,6 +334,7 @@ export default class FastCommentsIntegrationCore {
             const domainName = await this.getDomain();
             const rawTokenUpsertResponse = await this.makeHTTPRequest('PUT', `${this.baseUrl}/token?token=${token}&integrationType=${this.integrationType}&domain=${domainName}`);
             /** @type {FastCommentsTokenUpsertResponse} **/
+            console.log(rawTokenUpsertResponse.responseBody, typeof rawTokenUpsertResponse.responseBody)
             const tokenUpsertResponse = JSON.parse(rawTokenUpsertResponse.responseBody);
             if (tokenUpsertResponse.status === 'success' && tokenUpsertResponse.isTokenValidated === true) {
                 await this.setSettingValue('fastcomments_tenant_id', tokenUpsertResponse.tenantId);
@@ -330,37 +367,10 @@ export default class FastCommentsIntegrationCore {
                 for (const command of response.commands) {
                     switch (command.command) {
                         case 'FetchEvents':
-                            let fromDateTime = lastFetchDate;
-                            let hasMore = true;
-                            const startedAt = Date.now();
-                            while(hasMore && Date.now() - startedAt < 30 * 1000) {
-                                const rawIntegrationEventsResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/events?token=${token}&fromDateTime=${fromDateTime}`);
-                                /** @type {FastCommentsEventStreamResponse} **/
-                                const response = JSON.parse(rawIntegrationEventsResponse.responseBody);
-                                if (response.status === 'success') {
-                                    this.log('info', `Got events count: ${response.events.length}`);
-                                    if (response.events && response.events.length > 0) {
-                                        await this.handleEvents(response.events);
-                                        fromDateTime = response.events[response.events.length - 1].createdAt;
-                                        await this.setSettingValue('fastcomments_stream_last_fetch_date', fromDateTime);
-                                    } else {
-                                        break;
-                                    }
-                                    hasMore = response.hasMore;
-                                } else {
-                                    this.log('error', `Failed to get events: ${rawIntegrationEventsResponse}`);
-                                    break;
-                                }
-                            }
+                            await this.commandFetchEvents(token)
                             break;
                         case 'SendComments':
-                            // limit us to sending for 30 seconds, maintaining last_comment_sent_timestamp with each send
-                            // log "sending x comments"
-                            // if no more comments:
-                            //  pass "hasMore = false", and the server should stop telling us SendComments
-                            //  await this.setSettingValue('fastcomments_stream_last_fetch_date', now);
-                            // tell server
-                            // else
+                            await this.commandSendComments(token);
                             break;
                     }
                 }
@@ -370,4 +380,68 @@ export default class FastCommentsIntegrationCore {
         return null;
     }
 
+    async commandFetchEvents(token) {
+        let fromDateTime = await this.getSettingValue('fastcomments_stream_last_fetch_date');
+        let hasMore = true;
+        const startedAt = Date.now();
+        while (hasMore && Date.now() - startedAt < 30 * 1000) {
+            const rawIntegrationEventsResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/events?token=${token}&fromDateTime=${fromDateTime}`);
+            /** @type {FastCommentsEventStreamResponse} **/
+            const response = JSON.parse(rawIntegrationEventsResponse.responseBody);
+            if (response.status === 'success') {
+                this.log('info', `Got events count: ${response.events.length}`);
+                if (response.events && response.events.length > 0) {
+                    await this.handleEvents(response.events);
+                    fromDateTime = response.events[response.events.length - 1].createdAt;
+                    await this.setSettingValue('fastcomments_stream_last_fetch_date', fromDateTime);
+                } else {
+                    break;
+                }
+                hasMore = response.hasMore;
+            } else {
+                this.log('error', `Failed to get events: ${rawIntegrationEventsResponse}`);
+                break;
+            }
+        }
+    }
+
+    async commandSendComments(token) {
+        const lastSendDate = await this.getSettingValue('fastcomments_stream_last_send_date');
+        const startedAt = Date.now();
+        let hasMore = true;
+        let skip = 0;
+        let countSyncedSoFar = 0;
+        const commentCount = await this.getCommentCount();
+        while (hasMore && Date.now() - startedAt < 30 * 1000) {
+            const getCommentsResponse = await this.getComments(lastSendDate, skip); // intentionally don't read latest fastcomments_stream_last_send_date to make pagination simple
+            if (getCommentsResponse.status === 'success') {
+                this.log('info', `Got events count=[${getCommentsResponse.comments.length}]`);
+                if (getCommentsResponse.comments && getCommentsResponse.comments.length > 0) {
+                    const httpResponse = await this.makeHTTPRequest('POST', `${this.baseUrl}/comments?token=${token}`, JSON.stringify({
+                        countRemaining: commentCount - getCommentsResponse.comments.length - countSyncedSoFar,
+                        comments: getCommentsResponse.comments
+                    }));
+                    this.log('debug', `Got POST /comments response status code=[${httpResponse.responseStatus}]`);
+                    const response = JSON.parse(httpResponse.responseBody);
+                    if (response.status === 'success') {
+                        const fromDateTime = getCommentsResponse.comments[getCommentsResponse.comments.length - 1].createdAt;
+                        await this.setSettingValue('fastcomments_stream_last_send_date', fromDateTime); // if we crash we can restart from this date
+                        hasMore = getCommentsResponse.hasMore;
+                        skip += getCommentsResponse.comments.length;
+                        countSyncedSoFar += getCommentsResponse.comments.length;
+                    } else {
+                        // we'll keep trying for 30 seconds
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                this.log('error', `Failed to get comments to send: status=[${getCommentsResponse.status}] comments=[${getCommentsResponse.comments}] hasMore=[${getCommentsResponse.hasMore}]`);
+                break;
+            }
+        }
+    }
+
 }
+
+module.exports = { FastCommentsIntegrationCore };
