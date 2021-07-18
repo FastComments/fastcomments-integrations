@@ -26,28 +26,32 @@ const HOST = process.env.FC_HOST || 'https://fastcomments.com';
     await page.click('button[type="submit"]');
     await page.waitForSelector('body');
 
-    // let's create some testing data locally.
+    try {
+        // TODO create some testing comments locally.
 
-    async function tryToValidateToken() {
-        const token = await myApp.fastComments.getSettingValue('fastcomments_token');
-        if (token) { // startSetupPoll event loop set a token
-            await page.goto(`${HOST}/my-account/integrations/v1/setup?token=${token}`);
-            await page.waitForSelector('token-found');
-            return; // done
+        async function tryToValidateToken() {
+            const token = await myApp.fastComments.getSettingValue('fastcomments_token');
+            if (token) { // startSetupPoll event loop set a token
+                await page.goto(`${HOST}/my-account/integrations/v1/setup?token=${token}`);
+                await page.waitForSelector('token-found');
+                return; // done
+            }
+            setTimeout(tryToValidateToken, 1000);
         }
-        setTimeout(tryToValidateToken, 1000);
+
+        // This promise resolves once the app says setup is done, and the user has successfully confirmed the integration
+        await new Promise.all([
+            myApp.startSetupPoll(), // start the setup flow
+            tryToValidateToken(), // have the admin user visit the page to setup the integration
+        ]);
+
+        // TODO sync our local testing data (comments) to the FastComments backend.
+
+        // TODO add some events via FastComments (add comments, remove some, update some, add some votes, undo those votes), and then see that they get synced locally.
+    } catch (e) {
+        console.error(e);
     }
 
-    // This promise resolves once the app says setup is done, and the user has successfully confirmed the integration
-    await new Promise.all([
-        myApp.startSetupPoll(), // start the setup flow
-        tryToValidateToken(), // have the admin user visit the page to setup the integration
-    ]);
-
-    // Now we should sync our local testing data (comments) to the FastComments backend.
-    
-
-    // Add some events via FastComments (add comments, remove some, update some, add some votes, undo those votes), and then see that they get synced locally.
-
     // delete our testing tenant
+    // TODO have tenant deletion delete integration related stuff
 })();

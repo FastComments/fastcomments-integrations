@@ -12,7 +12,7 @@ For example, if you are building a Drupal or WordPress plugin, you should **stat
 into your project.
 
 ## Integration Protocol
-token
+
 The protocol uses a `polling` mechanism as opposed to having FastComments `push` the events to the client.
 
 This is to reduce friction on setup, as this way firewalls and DDOS prevention tools are much less of a concern. The first
@@ -26,15 +26,17 @@ This way, you only have to be able to reach us!
 Your integration needs to be able to handle:
 
 1. Initial setup.
-2. Fetch the command stream.
-3. Upstream sync.
+2. Upstream sync.
+3. Fetch the command stream.
 4. Poll the event log.
 
 ### Integration Flow - Initial Setup
 
-For the initial setup your integration be able to send the following HTTPs request: `PUT https://fastcomments.com/integrations/v1/token?token=<token uuid>`.
+For the initial setup your integration be able to send the following HTTPs request: `PUT https://fastcomments.com/integrations/v1/token?token=<token uuid>&integrationType<integration type>&domain=<mysubdomain.mysite.com>`.
 
-It is expected to do this repeatedly until the user acknowledges the integration (and thus your token will be accepted, and this API will return a success response).
+For upgrading from previous versions, or when the integration is for a platform where comments would already not exist, pass `&skipInitialSync=true` in the first PUT request.
+
+It is expected to do this repeatedly until the user acknowledges the integration (and thus your token will be accepted, and this API will return a success response denoted by `isTokenValidated = true`).
 
 Once the token has been validated, the integration should periodically poll the `integration stream` via:
 

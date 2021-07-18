@@ -418,7 +418,7 @@ class FastCommentsIntegrationCore {
                 this.log('info', `Got events count=[${getCommentsResponse.comments.length}]`);
                 if (getCommentsResponse.comments && getCommentsResponse.comments.length > 0) {
                     const httpResponse = await this.makeHTTPRequest('POST', `${this.baseUrl}/comments?token=${token}`, JSON.stringify({
-                        countRemaining: commentCount - getCommentsResponse.comments.length - countSyncedSoFar,
+                        countRemaining: commentCount - (getCommentsResponse.comments.length + countSyncedSoFar),
                         comments: getCommentsResponse.comments
                     }));
                     this.log('debug', `Got POST /comments response status code=[${httpResponse.responseStatus}]`);
