@@ -357,7 +357,7 @@ class FastCommentsIntegrationCore {
             this.getSettingValue('fastcomments_token'),
             this.getSettingValue('fastcomments_stream_last_fetch_timestamp')
         ]);
-        const rawIntegrationStreamResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/commands?token=${token}&lastFetchDate=${lastFetchDate ? lastFetchDate : 0}`);
+        const rawIntegrationStreamResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/commands?token=${token}&fromDateTime=${lastFetchDate ? lastFetchDate : 0}`);
         this.log('debug', 'Stream response status: ' + rawIntegrationStreamResponse.responseStatus);
         if (rawIntegrationStreamResponse.responseStatus === 200) {
             /** @type {FastCommentsCommandStreamResponse} **/
@@ -385,7 +385,7 @@ class FastCommentsIntegrationCore {
         let hasMore = true;
         const startedAt = Date.now();
         while (hasMore && Date.now() - startedAt < 30 * 1000) {
-            const rawIntegrationEventsResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/events?token=${token}&fromDateTime=${fromDateTime}`);
+            const rawIntegrationEventsResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/events?token=${token}&fromDateTime=${fromDateTime ? fromDateTime : 0}`);
             /** @type {FastCommentsEventStreamResponse} **/
             const response = JSON.parse(rawIntegrationEventsResponse.responseBody);
             if (response.status === 'success') {

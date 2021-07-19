@@ -133,24 +133,24 @@ const HOST = process.env.FC_HOST || 'https://fastcomments.com';
         await syncToFastComments();
 
         // pull our testing events, and then see that they get synced locally.
-        // async function syncFromFastComments() {
-        //     return new Promise((resolve) => {
-        //         async function tick() {
-        //             await myApp.cron();
-        //             const isSyncDone = Object.keys(myApp.fastComments.commentDB).length > 3;
-        //             if (isSyncDone) {
-        //                 // TODO assert data
-        //                 resolve();
-        //             } else {
-        //                 setTimeout(tick, 1000);
-        //             }
-        //         }
-        //
-        //         tick();
-        //     });
-        // }
-        //
-        // await syncFromFastComments();
+        async function syncFromFastComments() {
+            return new Promise((resolve) => {
+                async function tick() {
+                    await myApp.cron();
+                    const isSyncDone = Object.keys(myApp.fastComments.commentDB).length > 3;
+                    if (isSyncDone) {
+                        // TODO assert data
+                        resolve();
+                    } else {
+                        setTimeout(tick, 1000);
+                    }
+                }
+
+                tick();
+            });
+        }
+
+        await syncFromFastComments();
 
     } catch (e) {
         console.error(e);
