@@ -61,9 +61,10 @@ The command stream specifies commands to the client. Supported commands:
 
 ### Protocol - Upstream Sync
 
-When the client receives a `SendNextCommentsPayload` command, it should look at the details of this command to determine
-what the next set of comments are to sync. This command should define `start` and `count` parameters so the client can paginate
-the next set of results and send them to `POST https://fastcomments.com/integrations/v1/comments`. 
+When the client receives a `SendComments` command, it should paginate through all of its comments and send them to `POST https://fastcomments.com/integrations/v1/comments`.
+
+The request body should contain a `comments` array, and a `countRemaining` count. When this is zero, the `SendComments` command will disappear from the command stream
+until the user requests a sync again. Look at the example integrations for further details on the structures.
 
 ### Protocol - Event Log
 
@@ -74,6 +75,8 @@ The event log response will return the following events:
 - `deleted-comment`
 - `new-vote`
 - `deleted-vote`
+
+The event log should be periodically tailed.
 
 ### Testing
 
