@@ -59,8 +59,6 @@ The command stream specifies commands to the client. Supported commands:
 - `SendComments` - Send the next batch of comments. This is mostly used for initial migrations, but could also be used to re-sync.
 - `FetchEvents` - Paginate through the next set of events and apply them locally.
 
-Upon acknowledging a command, the integration should `POST https://fastcomments.com/integrations/v1/ack-command` with the `commandId` and `commandType` in the request body.
-
 ### Protocol - Upstream Sync
 
 When the client receives a `SendNextCommentsPayload` command, it should look at the details of this command to determine
