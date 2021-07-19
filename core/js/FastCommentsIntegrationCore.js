@@ -333,7 +333,6 @@ class FastCommentsIntegrationCore {
             const domainName = await this.getDomain();
             const rawTokenUpsertResponse = await this.makeHTTPRequest('PUT', `${this.baseUrl}/token?token=${token}&integrationType=${this.integrationType}&domain=${domainName}`);
             /** @type {FastCommentsTokenUpsertResponse} **/
-            console.log(rawTokenUpsertResponse.responseBody, typeof rawTokenUpsertResponse.responseBody)
             const tokenUpsertResponse = JSON.parse(rawTokenUpsertResponse.responseBody);
             if (tokenUpsertResponse.status === 'success' && tokenUpsertResponse.isTokenValidated === true) {
                 await this.setSettingValue('fastcomments_tenant_id', tokenUpsertResponse.tenantId);
@@ -362,7 +361,6 @@ class FastCommentsIntegrationCore {
         if (rawIntegrationStreamResponse.responseStatus === 200) {
             /** @type {FastCommentsCommandStreamResponse} **/
             const response = JSON.parse(rawIntegrationStreamResponse.responseBody);
-            console.log('commands', response.commands);
             if (response.status === 'success' && response.commands) {
                 for (const command of response.commands) {
                     switch (command.command) {
