@@ -237,10 +237,9 @@ class FastCommentsIntegrationCore {
 
     /**
      * @param {number} startFromDateTime
-     * @param {number} skip
      * @return {Promise<GetCommentsResponse>}
      */
-    async getComments(startFromDateTime, skip) {
+    async getComments(startFromDateTime) {
         throw new Error('Implement me! getComments()');
     }
 
@@ -356,13 +355,14 @@ class FastCommentsIntegrationCore {
     async integrationStatePollNext() {
         const [token, lastFetchDate] = await Promise.all([
             this.getSettingValue('fastcomments_token'),
-            this.getSettingValue('fastcomments_stream_last_fetch_date')
+            this.getSettingValue('fastcomments_stream_last_fetch_timestamp')
         ]);
-        const rawIntegrationStreamResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/commands?token=${token}&lastFetchDate=${lastFetchDate}`);
+        const rawIntegrationStreamResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/commands?token=${token}&lastFetchDate=${lastFetchDate ? lastFetchDate : 0}`);
         this.log('debug', 'Stream response status: ' + rawIntegrationStreamResponse.responseStatus);
         if (rawIntegrationStreamResponse.responseStatus === 200) {
             /** @type {FastCommentsCommandStreamResponse} **/
             const response = JSON.parse(rawIntegrationStreamResponse.responseBody);
+            console.log('commands', response.commands);
             if (response.status === 'success' && response.commands) {
                 for (const command of response.commands) {
                     switch (command.command) {
@@ -381,7 +381,7 @@ class FastCommentsIntegrationCore {
     }
 
     async commandFetchEvents(token) {
-        let fromDateTime = await this.getSettingValue('fastcomments_stream_last_fetch_date');
+        let fromDateTime = await this.getSettingValue('fastcomments_stream_last_fetch_timestamp');
         let hasMore = true;
         const startedAt = Date.now();
         while (hasMore && Date.now() - startedAt < 30 * 1000) {
@@ -393,7 +393,7 @@ class FastCommentsIntegrationCore {
                 if (response.events && response.events.length > 0) {
                     await this.handleEvents(response.events);
                     fromDateTime = response.events[response.events.length - 1].createdAt;
-                    await this.setSettingValue('fastcomments_stream_last_fetch_date', fromDateTime);
+                    await this.setSettingValue('fastcomments_stream_last_fetch_timestamp', fromDateTime);
                 } else {
                     break;
                 }
@@ -406,16 +406,16 @@ class FastCommentsIntegrationCore {
     }
 
     async commandSendComments(token) {
-        const lastSendDate = await this.getSettingValue('fastcomments_stream_last_send_date');
+        this.log('debug', 'Starting to send comments');
+        let lastSendDate = await this.getSettingValue('fastcomments_stream_last_send_timestamp');
         const startedAt = Date.now();
         let hasMore = true;
-        let skip = 0;
         let countSyncedSoFar = 0;
         const commentCount = await this.getCommentCount();
         while (hasMore && Date.now() - startedAt < 30 * 1000) {
-            const getCommentsResponse = await this.getComments(lastSendDate, skip); // intentionally don't read latest fastcomments_stream_last_send_date to make pagination simple
+            const getCommentsResponse = await this.getComments(lastSendDate ? lastSendDate : 0);
             if (getCommentsResponse.status === 'success') {
-                this.log('info', `Got events count=[${getCommentsResponse.comments.length}]`);
+                this.log('info', `Got comments to send count=[${getCommentsResponse.comments.length}] hasMore=[${getCommentsResponse.hasMore}]`);
                 if (getCommentsResponse.comments && getCommentsResponse.comments.length > 0) {
                     const httpResponse = await this.makeHTTPRequest('POST', `${this.baseUrl}/comments?token=${token}`, JSON.stringify({
                         countRemaining: commentCount - (getCommentsResponse.comments.length + countSyncedSoFar),
@@ -425,14 +425,20 @@ class FastCommentsIntegrationCore {
                     const response = JSON.parse(httpResponse.responseBody);
                     if (response.status === 'success') {
                         const fromDateTime = getCommentsResponse.comments[getCommentsResponse.comments.length - 1].createdAt;
-                        await this.setSettingValue('fastcomments_stream_last_send_date', fromDateTime); // if we crash we can restart from this date
+                        lastSendDate = fromDateTime;
+                        await this.setSettingValue('fastcomments_stream_last_send_timestamp', fromDateTime); // if we crash we can restart from this date
                         hasMore = getCommentsResponse.hasMore;
-                        skip += getCommentsResponse.comments.length;
                         countSyncedSoFar += getCommentsResponse.comments.length;
+
+                        if (!hasMore) {
+                            await this.setSettingValue('fastcomments_sync_completed', true); // currently just for tests
+                            break;
+                        }
                     } else {
                         // we'll keep trying for 30 seconds
                     }
                 } else {
+                    await this.setSettingValue('fastcomments_sync_completed', true); // currently just for tests
                     break;
                 }
             } else {
@@ -440,6 +446,7 @@ class FastCommentsIntegrationCore {
                 break;
             }
         }
+        this.log('debug', 'Done sending comments');
     }
 
 }

@@ -18,18 +18,20 @@ const HOST = process.env.FC_HOST || 'https://fastcomments.com';
     // create a tenant to test with
     const page = await browser.newPage();
     await page.goto(`${HOST}/auth/tenant-signup`);
-    await page.waitForSelector('form');
-    await page.focus('input[name="username"]');
+    await page.waitForSelector('#signup-form');
+    await page.focus('input[name=username]');
     await page.keyboard.type(tenantName);
-    await page.focus('input[name="email"]');
+    await page.focus('input[name=email]');
     await page.keyboard.type(`${tenantName}@fctest.com`); // We won't send emails to @fctest
-    await page.click('button[type="submit"]');
+    await page.focus('input[name=companyName]');
+    await page.keyboard.type(tenantName);
+    await page.focus('input[name=domains]');
+    await page.keyboard.type('fastcomments.com');
+    await page.click('button[type=submit]');
     await page.waitForSelector('body');
-
-    // TODO add some testing events to the account (add comments, remove some, update some, add some votes, undo those votes).
+    console.assert((await page.title()) === 'FastComments - Welcome!');
 
     try {
-        // TODO create some testing comments locally.
 
         myApp.fastComments.commentDB['external-id-0'] = {
             "urlId": "test",
@@ -87,64 +89,77 @@ const HOST = process.env.FC_HOST || 'https://fastcomments.com';
             "approved": true
         };
 
-        async function tryToValidateToken() {
+        await myApp.createToken();
+
+        async function openPageToValidateToken() {
             const token = await myApp.fastComments.getSettingValue('fastcomments_token');
-            if (token) { // startSetupPoll event loop set a token
-                await page.goto(`${HOST}/my-account/integrations/v1/setup?token=${token}`);
-                await page.waitForSelector('token-found');
-                return; // done
-            }
-            setTimeout(tryToValidateToken, 1000);
+            await page.goto(`${HOST}/auth/my-account/integrations/v1/setup?token=${token}`);
         }
 
-        // This promise resolves once the app says setup is done, and the user has successfully confirmed the integration
-        await new Promise.all([
-            myApp.startSetupPoll(), // start the setup flow
-            tryToValidateToken(), // have the admin user visit the page to setup the integration
-        ]);
+        await openPageToValidateToken(); // have the admin user visit the page to setup the integration
+
+        // This promise resolves once the app says setup is done, and the user has successfully confirmed the integration (by keeping the above page open).
+        await myApp.waitForTenantId();
+
+        async function createTestingData() {
+            const token = await myApp.fastComments.getSettingValue('fastcomments_token');
+            // create some testing events in our new account (add comments, remove some, update some, add some votes, undo those votes).
+            await page.goto(`${HOST}/auth/my-account/integrations/v1/create-testing-events?token=${token}`);
+            await page.waitForSelector('body');
+        }
+
+        await createTestingData();
 
         // send our local testing data (comments) to the FastComments backend.
         async function syncToFastComments() {
-            return new Promise((resolve) => {
+            const start = Date.now();
+            console.log('Sync to backend starting...');
+            await new Promise((resolve) => {
                 async function tick() {
                     await myApp.cron();
-                    const isSyncDone = await page.$eval('.log-complete', () => true).catch(() => false);
+                    const isSyncDone = await myApp.fastComments.getSettingValue('fastcomments_sync_completed');
                     if (isSyncDone) {
                         resolve();
                     } else {
                         setTimeout(tick, 1000);
                     }
                 }
+
                 tick();
             });
+            console.log(`Sync to backend done... ${Date.now() - start}ms`);
         }
 
         await syncToFastComments();
 
         // pull our testing events, and then see that they get synced locally.
-        async function syncFromFastComments() {
-            return new Promise((resolve) => {
-                async function tick() {
-                    await myApp.cron();
-                    const isSyncDone = Object.keys(myApp.fastComments.commentDB).length > 2;
-                    if (isSyncDone) {
-                        resolve();
-                    } else {
-                        setTimeout(tick, 1000);
-                    }
-                }
-                tick();
-            });
-        }
-
-        await syncFromFastComments();
+        // async function syncFromFastComments() {
+        //     return new Promise((resolve) => {
+        //         async function tick() {
+        //             await myApp.cron();
+        //             const isSyncDone = Object.keys(myApp.fastComments.commentDB).length > 3;
+        //             if (isSyncDone) {
+        //                 // TODO assert data
+        //                 resolve();
+        //             } else {
+        //                 setTimeout(tick, 1000);
+        //             }
+        //         }
+        //
+        //         tick();
+        //     });
+        // }
+        //
+        // await syncFromFastComments();
 
     } catch (e) {
         console.error(e);
+        // delete our testing tenant via hitting a safe endpoint
+        await page.goto(`${HOST}/test-e2e/api/tenant/delete-current-tenant`);
+        process.exit(1);
     }
 
-    // delete our testing tenant via hitting safe endpoint via puppeteer
-
-
-    // TODO have tenant deletion delete integration related stuff
+    // delete our testing tenant via hitting a safe endpoint
+    await page.goto(`${HOST}/test-e2e/api/tenant/delete-current-tenant`);
+    process.exit(0);
 })();

@@ -97,6 +97,9 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
             transformResponse: (res) => {
                 return res; // this is because makeHTTPRequest only expects to work with string http bodies.
             },
+            headers: {
+                'Content-Type': 'application/json'
+            },
             responseType: 'text'
         });
         return {
@@ -199,6 +202,13 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
     }
 
     /**
+     * @return {Promise<number>}
+     */
+    async getCommentCount() {
+        return Object.values(this.commentDB).length;
+    }
+
+    /**
      * @typedef {Object} GetCommentsResponse
      * @property {'success'|'failure'} status
      * @property {Array.<FastCommentsEventStreamDataComment>} comments
@@ -207,19 +217,23 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
 
     /**
      * @param {number} startFromDateTime
-     * @param {number} skip
      * @return {Promise<GetCommentsResponse>}
      */
-    async getComments(startFromDateTime, skip) {
+    async getComments(startFromDateTime) {
         // obviously, you would use a proper database with carefully designed indexes, right? :)
-        const limit = 10;
-        const comments = Object.values(this.commentDB)
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // we want to send comments oldest -> newest
-            .filter((comment, index) => (!skip || index >= skip) && index < limit && new Date(comment.date).getTime() >= startFromDateTime);
+
+        async function getCommentsFrom(db, startFromDateTime) {
+            return Object.values(db)
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // we want to send comments oldest -> newest
+                .filter((comment, index) => new Date(comment.date).getTime() >= startFromDateTime);
+        }
+
+        const comments = await getCommentsFrom(this.commentDB, startFromDateTime);
+        const remainingComments = comments ? await getCommentsFrom(this.commentDB, comments[comments.length - 1].date) : [];
         return {
             status: 'success',
             comments: comments,
-            hasMore: comments.length === limit
+            hasMore: remainingComments.length > 0
         }
     }
 }
@@ -230,7 +244,7 @@ class FastCommentsCoreExampleUsage {
         this.fastComments = new FastCommentsIntegrationCoreExample();
     }
 
-    async startSetupPoll() {
+    async createToken() {
         let hasToken = false;
         while (!hasToken) {
             console.log('Polling for token...');
@@ -239,6 +253,9 @@ class FastCommentsCoreExampleUsage {
             await new Promise((resolve) => setTimeout(resolve, 1000));
         }
         console.log('Got token!', await this.fastComments.getSettingValue('fastcomments_token'));
+    }
+
+    async waitForTenantId() {
         let hasTenantId = false;
         while (!hasTenantId) {
             console.log('Polling for tenant id... (set when user accepts token in admin).');
