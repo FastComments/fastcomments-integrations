@@ -71,20 +71,22 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
         function getCommentsFrom($db, $startFromDateTime) {
             $dbValues = array_values($db);
             function cmp($a, $b) {
-                
             }
-            $dbValuesSorted = usort($dbValues, "cmp");
-            return asort(
-                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) // we want to send comments oldest -> newest
-                .filter((comment, index) => new Date(comment.date).getTime() >= startFromDateTime);
+            usort($dbValues, function($a, $b) {
+                return strtotime($a->date) - strtotime($b->date); // we want oldest to newest
+            });
+
+            return array_filter($dbValues, function($comment) use (&$startFromDateTime) {
+                return strtotime($comment->date) >= $startFromDateTime;
+            });
         }
 
-        $comments = getCommentsFrom(this.commentDB, startFromDateTime);
-        $remainingComments = comments ? getCommentsFrom(this.commentDB, comments[comments.length - 1].date) : [];
+        $comments = getCommentsFrom($this->commentDB, $startFromDateTime);
+        $remainingComments = count($comments) > 0 ? getCommentsFrom($this->commentDB, $comments[count($comments) - 1]->date) : [];
         return array(
             "status" => "success",
-            "comments" => comments,
-            "hasMore" => remainingComments.length > 0
+            "comments" => $comments,
+            "hasMore" => count($remainingComments) > 0
         );
     }
 }
