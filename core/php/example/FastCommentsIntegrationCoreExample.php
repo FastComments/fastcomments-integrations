@@ -58,7 +58,55 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
     }
 
     public function handleEvents($events) {
-        // TODO: Implement handleEvents() method.
+        foreach ($events as $event) {
+            try {
+                /** @type {FastCommentsEventStreamItemData} **/
+                $eventData = json_decode($event->data);
+                $ourId = null;
+                $fcId = null;
+                $ourComment = null;
+                switch ($eventData->type) {
+                    case 'new-comment':
+                        $ourId = $this->createUUID();
+                        $fcId = $eventData->comment->_id;
+                        $this->fcToOurIds[$fcId] = $ourId;
+                        $this->commentDB[$ourId] = $eventData->comment;
+                        break;
+                    case 'updated-comment':
+                        $ourId = $this->fcToOurIds[$eventData->comment->_id];
+                        $this->commentDB[$ourId] = $eventData->comment;
+                        break;
+                    case 'deleted-comment':
+                        $ourId = $this->fcToOurIds[$eventData->comment->_id];
+                        unset($this->commentDB[$ourId]);
+                        break;
+                    case 'new-vote':
+                        $ourId = $this->fcToOurIds[$eventData->comment->_id];
+                        $ourComment = $this->commentDB[$ourId];
+                        if ($eventData->vote->direction > 0) {
+                            $ourComment->votes++;
+                            $ourComment->votesUp++;
+                        } else {
+                            $ourComment->votes--;
+                            $ourComment->votesDown++;
+                        }
+                        break;
+                    case 'deleted-vote':
+                        $ourId = $this->fcToOurIds[$eventData->comment->_id];
+                        $ourComment = $this->commentDB[$ourId];
+                        if ($eventData->vote->direction > 0) {
+                            $ourComment->votes--;
+                            $ourComment->votesUp--;
+                        } else {
+                            $ourComment->votes++;
+                            $ourComment->votesDown--;
+                        }
+                        break;
+                }
+            } catch (Exception $e) {
+                $this->log('error', $e->getMessage());
+            }
+        }
     }
 
     public function getCommentCount() {
