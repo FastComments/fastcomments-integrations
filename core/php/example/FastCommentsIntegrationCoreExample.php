@@ -10,7 +10,9 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
 
     public function __construct() {
         parent::__construct('test', getenv('FC_HOST'));
-        $this->settingDB = array();
+
+        // In the real world, you'd use a database or key value store to store these values.
+        $this->settingDB = array(); // we'll need a place to store the settings
         $this->fcToOurIds = array(); // we'll need a table, or way to map, the FastComments ids to your ids.
         $this->commentDB = array(); // we'll need a table to store the comments by id.
     }

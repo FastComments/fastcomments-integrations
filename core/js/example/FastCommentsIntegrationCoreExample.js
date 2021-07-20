@@ -6,7 +6,9 @@ const axios = require('axios');
 class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
     constructor() {
         super('test', process.env.FC_HOST);
-        this.settingDB = {};
+
+        // In the real world, you'd use a database or key value store to store these values.
+        this.settingDB = {}; // we'll need a place to store the settings
         this.fcToOurIds = {}; // we'll need a table, or way to map, the FastComments ids to your ids.
         this.commentDB = {}; // we'll need a table to store the comments by id.
     }
