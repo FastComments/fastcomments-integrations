@@ -1,5 +1,9 @@
 {
   "name": "fastcomments-integrations-core-test-harness",
+  "scripts": {
+    "run-tests-all-projects": "node run-tests-all-projects.js",
+    "run-tests-single-project": "node run-tests-single-project.js"
+  },
   "dependencies": {
     "puppeteer": "^10.1.0",
     "commander": "^8.0.0"
