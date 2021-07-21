@@ -14,25 +14,21 @@ class TestDB {
     }
 
     public function clear() {
-        $this->data = new stdClass();
+        $this->data = array();
         $this->write();
     }
 
     public function write() {
-        $outFile = fopen($this->path, 'w');
-        fwrite($outFile, json_encode($this->data));
-        fclose($outFile);
+        file_put_contents($this->path, json_encode($this->data));
     }
 
     public function read() {
         if (!file_exists($this->path)) {
-            $this->data = new stdClass();
+            $this->data = array();
             return;
         }
-        $inFile = fopen($this->path, 'r');
-        $rawFileContents = fread($inFile, filesize($this->path));
-        fclose($inFile);
-        $this->data = json_decode($rawFileContents);
+        $rawFileContents = file_get_contents($this->path);
+        $this->data = json_decode($rawFileContents, true);
     }
 
     public function getData() {
@@ -40,18 +36,18 @@ class TestDB {
     }
 
     public function setValue($name, $value) {
-        $this->data{$name} = $value;
+        $this->data[$name] = $value;
         $this->write();
     }
 
     public function unsetValue($name) {
-        unset($this->data{$name});
+        unset($this->data[$name]);
         $this->write();
     }
 
     public function getValue($name) {
         $this->read();
-        return $this->data{$name};
+        return isset($this->data[$name]) ? $this->data[$name] : null;
     }
 }
 
@@ -102,7 +98,36 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
     }
 
     public function makeHTTPRequest($method, $url, $body) {
-        // TODO: Implement makeHTTPRequest() method.
+        $curl = curl_init();
+
+        switch ($method) {
+            case "POST":
+                curl_setopt($curl, CURLOPT_POST, 1);
+                if ($body) {
+                    curl_setopt($curl, CURLOPT_POSTFIELDS, $body);
+                }
+                break;
+            case "PUT":
+                curl_setopt($curl, CURLOPT_PUT, 1);
+                break;
+            default:
+                if ($body) {
+                    $url = sprintf("%s?%s", $url, http_build_query($body));
+                }
+        }
+
+        curl_setopt($curl, CURLOPT_URL, $url);
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+
+        $rawResult = curl_exec($curl);
+
+        curl_close($curl);
+
+        $result = new stdClass();
+        $result->responseCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $result->responseBody = $rawResult;
+
+        return $result;
     }
 
     public function getCurrentUser() {
@@ -125,7 +150,7 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
     public function handleEvents($events) {
         foreach ($events as $event) {
             try {
-                /** @type {FastCommentsEventStreamItemData} **/
+                /** @type {FastCommentsEventStreamItemData} * */
                 $eventData = json_decode($event->data);
                 $ourId = null;
                 $fcId = null;
@@ -185,11 +210,12 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
             $dbValues = array_values($db);
             function cmp($a, $b) {
             }
-            usort($dbValues, function($a, $b) {
+
+            usort($dbValues, function ($a, $b) {
                 return strtotime($a->date) - strtotime($b->date); // we want oldest to newest
             });
 
-            return array_filter($dbValues, function($comment) use (&$startFromDateTime) {
+            return array_filter($dbValues, function ($comment) use (&$startFromDateTime) {
                 return strtotime($comment->date) >= $startFromDateTime;
             });
         }
@@ -217,7 +243,7 @@ class FastCommentsCoreExampleUsage {
         while (!$hasToken) {
             echo 'Polling for token...';
             $this->fastComments->tick();
-            $hasToken = !!$this->fastComments->getSettingValue('fastcomments_token');
+            $hasToken = $this->fastComments->getSettingValue('fastcomments_token') !== null;
             sleep(1);
         }
         echo 'Got Token! ' . $this->fastComments->getSettingValue('fastcomments_token');
@@ -228,7 +254,7 @@ class FastCommentsCoreExampleUsage {
         while (!$hasTenantId) {
             echo 'Polling for tenant id... (set when user accepts token in admin).';
             $this->fastComments->tick();
-            $hasTenantId = !!$this->fastComments->getSettingValue('fastcomments_tenant_id');
+            $hasTenantId = $this->fastComments->getSettingValue('fastcomments_tenant_id') !== null;
             sleep(1);
         }
         echo 'Got tenant id! ' . $this->fastComments->getSettingValue('fastcomments_tenant_id');

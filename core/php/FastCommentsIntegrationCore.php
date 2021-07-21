@@ -46,13 +46,13 @@ abstract class FastCommentsIntegrationCore {
     public function log($level, $message) {
         switch ($level) {
             case 'debug':
-                echo "DEBUG:::" . $message;
+                echo "DEBUG:::" . $message . "\n";
                 break;
             case 'info':
-                echo "INFO:::" . $message;
+                echo "INFO:::" . $message . "\n";
                 break;
             case 'error':
-                echo "ERROR:::" . $message;
+                echo "ERROR:::" . $message . "\n";
                 break;
         }
     }
