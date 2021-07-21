@@ -60,7 +60,11 @@ const {FastCommentsCoreExampleUsage} = require('./../example/FastCommentsIntegra
     });
 
     await new Promise((resolve) => {
+        const startTime = Date.now();
         async function tick() {
+            if (Date.now() - startTime > 30 * 1000) {
+                throw new Error('Sync taking too long!');
+            }
             await myApp.cron();
             const isSyncDone = await myApp.fastComments.getSettingValue('fastcomments_sync_completed');
             if (isSyncDone) {

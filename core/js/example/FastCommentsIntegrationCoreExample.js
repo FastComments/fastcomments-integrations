@@ -131,7 +131,7 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
     /**
      * @typedef {Object} HTTPResponse
      * @property {string} responseBody
-     * @property {number} responseStatus
+     * @property {number} responseStatusCode
      */
 
     /**
@@ -157,7 +157,7 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
         });
         return {
             responseBody: rawResponse.data,
-            responseStatus: rawResponse.status
+            responseStatusCode: rawResponse.status
         }
     }
 

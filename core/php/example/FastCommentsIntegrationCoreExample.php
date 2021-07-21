@@ -100,15 +100,16 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
     public function makeHTTPRequest($method, $url, $body) {
         $curl = curl_init();
 
+        curl_setopt($curl, CURLOPT_CUSTOMREQUEST, $method);
         switch ($method) {
             case "POST":
-                curl_setopt($curl, CURLOPT_POST, 1);
                 if ($body) {
                     curl_setopt($curl, CURLOPT_POSTFIELDS, $body);
+                    curl_setopt($curl, CURLOPT_HTTPHEADER, array(
+                        'Content-Type: application/json',
+                        'Content-Length: ' . strlen($body)
+                    ));
                 }
-                break;
-            case "PUT":
-                curl_setopt($curl, CURLOPT_PUT, 1);
                 break;
             default:
                 if ($body) {
@@ -120,17 +121,17 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
 //        curl_setopt($curl, CURLOPT_VERBOSE, true);
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
 
         $rawResult = curl_exec($curl);
 
         $result = new stdClass();
-        $result->responseCode = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        $result->responseStatusCode = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
         $result->responseBody = $rawResult;
 
-        // TODO remove
-        echo "Response URL " . $method . " " . $url . "\n";
-        echo "Response Code " . $result->responseCode . "\n";
-        echo "Response body " . $result->responseBody . "\n";
+//        echo "Response URL " . $method . " " . $url . "\n";
+//        echo "Response Code " . $result->responseStatusCode . "\n";
+//        echo "Response Body " . $result->responseBody . "\n";
 
         curl_close($curl);
 
@@ -170,7 +171,7 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
                         $this->commentDB->setValue($ourId, $eventData->comment);
                         break;
                     case 'updated-comment':
-                        $ourId = $this->fcToOurIds[$eventData->comment->_id];
+                        $ourId = $this->fcToOurIds->getValue($eventData->comment->_id);
                         $this->commentDB->setValue($ourId, $eventData->comment);
                         break;
                     case 'deleted-comment':
@@ -181,22 +182,22 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
                         $ourId = $this->fcToOurIds->getValue($eventData->comment->_id);
                         $ourComment = $this->commentDB->getValue($ourId);
                         if ($eventData->vote->direction > 0) {
-                            $ourComment->votes++;
-                            $ourComment->votesUp++;
+                            $ourComment['votes']++;
+                            $ourComment['votesUp']++;
                         } else {
-                            $ourComment->votes--;
-                            $ourComment->votesDown++;
+                            $ourComment['votes']--;
+                            $ourComment['votesDown']++;
                         }
                         break;
                     case 'deleted-vote':
                         $ourId = $this->fcToOurIds->getValue($eventData->comment->_id);
                         $ourComment = $this->commentDB->getValue($ourId);
                         if ($eventData->vote->direction > 0) {
-                            $ourComment->votes--;
-                            $ourComment->votesUp--;
+                            $ourComment['votes']--;
+                            $ourComment['votesUp']--;
                         } else {
-                            $ourComment->votes++;
-                            $ourComment->votesDown--;
+                            $ourComment['votes']++;
+                            $ourComment['votesDown']--;
                         }
                         break;
                 }
@@ -207,28 +208,25 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
     }
 
     public function getCommentCount() {
-        return count($this->commentDB->getData());
+        return count(array_keys($this->commentDB->getData()));
+    }
+
+    private static function getCommentsFrom($db, $startFromDateTime) {
+        $dbValues = array_values($db);
+        usort($dbValues, function ($a, $b) {
+            return strtotime($a['date']) - strtotime($b['date']); // we want oldest to newest
+        });
+
+        return array_filter($dbValues, function ($comment) use (&$startFromDateTime) {
+            return strtotime($comment['date']) >= $startFromDateTime;
+        });
     }
 
     public function getComments($startFromDateTime) {
         // obviously, you would use a proper database with carefully designed indexes, right? :)
 
-        function getCommentsFrom($db, $startFromDateTime) {
-            $dbValues = array_values($db);
-            function cmp($a, $b) {
-            }
-
-            usort($dbValues, function ($a, $b) {
-                return strtotime($a->date) - strtotime($b->date); // we want oldest to newest
-            });
-
-            return array_filter($dbValues, function ($comment) use (&$startFromDateTime) {
-                return strtotime($comment->date) >= $startFromDateTime;
-            });
-        }
-
-        $comments = getCommentsFrom($this->commentDB->getData(), $startFromDateTime);
-        $remainingComments = count($comments) > 0 ? getCommentsFrom($this->commentDB->getData(), $comments[count($comments) - 1]->date) : [];
+        $comments = FastCommentsIntegrationCoreExample::getCommentsFrom($this->commentDB->getData(), $startFromDateTime);
+        $remainingComments = count($comments) > 0 ? FastCommentsIntegrationCoreExample::getCommentsFrom($this->commentDB->getData(), $comments[count($comments) - 1]['date']) : [];
         return array(
             "status" => "success",
             "comments" => $comments,

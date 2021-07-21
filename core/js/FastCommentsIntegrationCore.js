@@ -167,7 +167,7 @@ class FastCommentsIntegrationCore {
     /**
      * @typedef {Object} HTTPResponse
      * @property {string} responseBody
-     * @property {number} responseStatus
+     * @property {number} responseStatusCode
      */
 
     /**
@@ -357,8 +357,8 @@ class FastCommentsIntegrationCore {
             this.getSettingValue('fastcomments_stream_last_fetch_timestamp')
         ]);
         const rawIntegrationStreamResponse = await this.makeHTTPRequest('GET', `${this.baseUrl}/commands?token=${token}&fromDateTime=${lastFetchDate ? lastFetchDate : 0}`);
-        this.log('debug', 'Stream response status: ' + rawIntegrationStreamResponse.responseStatus);
-        if (rawIntegrationStreamResponse.responseStatus === 200) {
+        this.log('debug', 'Stream response status: ' + rawIntegrationStreamResponse.responseStatusCode);
+        if (rawIntegrationStreamResponse.responseStatusCode === 200) {
             /** @type {FastCommentsCommandStreamResponse} **/
             const response = JSON.parse(rawIntegrationStreamResponse.responseBody);
             if (response.status === 'success' && response.commands) {
@@ -419,10 +419,10 @@ class FastCommentsIntegrationCore {
                         countRemaining: commentCount - (getCommentsResponse.comments.length + countSyncedSoFar),
                         comments: getCommentsResponse.comments
                     }));
-                    this.log('debug', `Got POST /comments response status code=[${httpResponse.responseStatus}]`);
+                    this.log('debug', `Got POST /comments response status code=[${httpResponse.responseStatusCode}]`);
                     const response = JSON.parse(httpResponse.responseBody);
                     if (response.status === 'success') {
-                        const fromDateTime = getCommentsResponse.comments[getCommentsResponse.comments.length - 1].createdAt;
+                        const fromDateTime = new Date(getCommentsResponse.comments[getCommentsResponse.comments.length - 1].date).getTime();
                         lastSendDate = fromDateTime;
                         await this.setSettingValue('fastcomments_stream_last_send_timestamp', fromDateTime); // if we crash we can restart from this date
                         hasMore = getCommentsResponse.hasMore;
@@ -433,7 +433,7 @@ class FastCommentsIntegrationCore {
                             break;
                         }
                     } else {
-                        // we'll keep trying for 30 seconds
+                        break;
                     }
                 } else {
                     await this.setSettingValue('fastcomments_sync_completed', true); // currently just for tests

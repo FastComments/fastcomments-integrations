@@ -5,6 +5,7 @@ const {FastCommentsCoreExampleUsage} = require('./../example/FastCommentsIntegra
     myApp.fastComments.dropDatabase();
     console.assert(!(await myApp.fastComments.getSettingValue('fastcomments_token')), 'No token yet.');
     console.assert(!(await myApp.fastComments.getSettingValue('fastcomments_setup')), 'Not yet setup.');
+    console.assert(Object.keys(myApp.fastComments.commentDB.getData()).length === 0, 'Should not have any comments yet.');
     await myApp.createToken();
 
     process.exit(0);

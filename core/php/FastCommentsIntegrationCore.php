@@ -135,15 +135,18 @@ abstract class FastCommentsIntegrationCore {
     }
 
     public function integrationStatePollNext() {
+        // One idea to consider, that'd be easier to understand, would be to store the commands locally and a queue and process them.
+        // This removes the weird logic where each time a command is finished processing, we advance the fastcomments_stream_last_fetch_timestamp.
+        // The reason this logic is weird is the two things are relatively far from each other, potentially being bug prone.
         $token = $this->getSettingValue('fastcomments_token');
         $lastFetchDate = $this->getSettingValue('fastcomments_stream_last_fetch_timestamp');
         $lastFetchDateToSend = $lastFetchDate !== null ? $lastFetchDate : 0;
         $rawIntegrationStreamResponse = $this->makeHTTPRequest('GET', "$this->baseUrl/commands?token=$token&fromDateTime=$lastFetchDateToSend", null);
-        $this->log('debug', 'Stream response status: ' . $rawIntegrationStreamResponse->responseStatus);
-        if ($rawIntegrationStreamResponse->responseStatus === 200) {
+        $this->log('debug', 'Stream response status: ' . $rawIntegrationStreamResponse->responseStatusCode);
+        if ($rawIntegrationStreamResponse->responseStatusCode === 200) {
             $response = json_decode($rawIntegrationStreamResponse->responseBody);
             if ($response->status === 'success' && $response->commands) {
-                foreach ($response->commands as $command => $___) {
+                foreach ($response->commands as $command) {
                     switch ($command->command) {
                         case 'FetchEvents':
                             $this->commandFetchEvents($token);
@@ -163,19 +166,19 @@ abstract class FastCommentsIntegrationCore {
         $hasMore = true;
         $startedAt = time();
         while ($hasMore && time() - $startedAt < 30 * 1000) {
+            $this->log('debug', 'Send events command loop...');
             $fromDateTimeToSend = $fromDateTime !== null ? $fromDateTime : 0;
             $rawIntegrationEventsResponse = $this->makeHTTPRequest('GET', "$this->baseUrl/events?token=$token&fromDateTime=$fromDateTimeToSend", null);
             $response = json_decode($rawIntegrationEventsResponse->responseBody);
             if ($response->status === 'success') {
-                $this->log('info', "Got events count: {count($response->events)}");
+                $count = count($response->events);
+                $this->log('info', "Got events count=[$count]");
                 if ($response->events && count($response->events) > 0) {
                     $this->handleEvents($response->events);
-                    $fromDateTime = $response->events[count($response->events) - 1]->createdAt;
-                    $this->setSettingValue('fastcomments_stream_last_fetch_timestamp', $fromDateTime);
-                } else {
-                    break;
+                    $fromDateTime = strtotime($response->events[count($response->events) - 1]->createdAt);
                 }
                 $hasMore = $response->hasMore;
+                $this->setSettingValue('fastcomments_stream_last_fetch_timestamp', $fromDateTime);
             } else {
                 $this->log('error', "Failed to get events: {$rawIntegrationEventsResponse}");
                 break;
@@ -191,31 +194,46 @@ abstract class FastCommentsIntegrationCore {
         $countSyncedSoFar = 0;
         $commentCount = $this->getCommentCount();
         while ($hasMore && time() - $startedAt < 30 * 1000) {
-            $getCommentsResponse = $this->getComments(($lastSendDate) ? $lastSendDate : 0);
-            if ($getCommentsResponse->status === 'success') {
-                $this->log('info', "Got comments to send count=[] hasMore=[]{count($getCommentsResponse->comments)}{$getCommentsResponse->hasMore}");
-                if ($getCommentsResponse->comments && count($getCommentsResponse->comments) > 0) {
-                    $httpResponse = $this->makeHTTPRequest('POST', "$this->baseUrl/comments?token=$token", json_encode(array("countRemaining" => $commentCount - count($getCommentsResponse->comments) + $countSyncedSoFar, "comments" => $getCommentsResponse->comments)));
-                    $this->log('debug', "Got POST /comments response status code=[]{$httpResponse->responseStatus}");
+            $this->log('debug', 'Send comments command loop...');
+            $getCommentsResponse = $this->getComments($lastSendDate ? $lastSendDate : 0);
+            if ($getCommentsResponse['status'] === 'success') {
+                $count = count($getCommentsResponse['comments']);
+                $hasMore = $getCommentsResponse['hasMore'];
+                $this->log('info', "Got comments to send count=[$count] hasMore=[$hasMore]");
+                if ($getCommentsResponse['comments'] && count($getCommentsResponse['comments']) > 0) {
+                    $countRemaining = $commentCount - count($getCommentsResponse['comments']) + $countSyncedSoFar;
+                    $requestBody = json_encode(
+                        array(
+                            "countRemaining" => $countRemaining,
+                            "comments" => $getCommentsResponse['comments']
+                        )
+                    );
+                    $httpResponse = $this->makeHTTPRequest('POST', "$this->baseUrl/comments?token=$token", $requestBody);
+                    $this->log('debug', "Got POST /comments response status code=[$httpResponse->responseStatusCode]");
                     $response = json_decode($httpResponse->responseBody);
+                    var_dump($response);
                     if ($response->status === 'success') {
-                        $fromDateTime = $getCommentsResponse->comments[count($getCommentsResponse->comments) - 1]->createdAt;
+                        $fromDateTime = strtotime($getCommentsResponse['comments'][count($getCommentsResponse['comments']) - 1]['date']) * 1000;
                         $lastSendDate = $fromDateTime;
                         $this->setSettingValue('fastcomments_stream_last_send_timestamp', $fromDateTime);
-                        $hasMore = $getCommentsResponse->hasMore;
-                        $countSyncedSoFar += count($getCommentsResponse->comments);
+                        echo "HasMore: $hasMore \n";
+                        $countSyncedSoFar += count($getCommentsResponse['comments']);
                         if (!$hasMore) {
                             $this->setSettingValue('fastcomments_sync_completed', true);
+                            $this->setSettingValue('fastcomments_stream_last_fetch_timestamp', time() * 1000);
                             break;
                         }
-                    } else {
                     }
                 } else {
                     $this->setSettingValue('fastcomments_sync_completed', true);
+                    $this->setSettingValue('fastcomments_stream_last_fetch_timestamp', time() * 1000);
                     break;
                 }
             } else {
-                $this->log('error', "Failed to get comments to send: status=[] comments=[] hasMore=[]{$getCommentsResponse->status}{$getCommentsResponse->comments}{$getCommentsResponse->hasMore}");
+                $status = $getCommentsResponse['status'];
+                $comments = $getCommentsResponse['comments'];
+                $debugHasMore = $getCommentsResponse['hasMore'];
+                $this->log('error', "Failed to get comments to send: status=[$status] comments=[$comments] hasMore=[$debugHasMore]}");
                 break;
             }
         }

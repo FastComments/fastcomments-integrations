@@ -5,7 +5,11 @@ const {FastCommentsCoreExampleUsage} = require('./../example/FastCommentsIntegra
 
     // pull our testing events, and then see that they get synced locally.
     await new Promise((resolve) => {
+        const startTime = Date.now();
         async function tick() {
+            if (Date.now() - startTime > 30 * 1000) {
+                throw new Error('Sync taking too long!');
+            }
             await myApp.cron();
             const isSyncDone = Object.keys(myApp.fastComments.commentDB.getData()).length > 3;
             if (isSyncDone) {
