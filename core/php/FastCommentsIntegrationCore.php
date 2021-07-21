@@ -12,7 +12,7 @@ abstract class FastCommentsIntegrationCore {
             throw new RuntimeException('An integration host is required! A valid default is available, did you try to set this to a weird value?');
         }
         $this->integrationType = $integrationType;
-        $this->baseUrl = "/integrations/v1{$host}";
+        $this->baseUrl = "$host/integrations/v1";
     }
 
     public abstract function activate();
@@ -117,7 +117,7 @@ abstract class FastCommentsIntegrationCore {
         $token = $this->getSettingValue('fastcomments_token');
         if ($token) {
             $domainName = $this->getDomain();
-            $rawTokenUpsertResponse = $this->makeHTTPRequest('PUT', "/token?token=&integrationType=&domain={$this->baseUrl}{$token}{$this->integrationType}{$domainName}", null);
+            $rawTokenUpsertResponse = $this->makeHTTPRequest('PUT', "$this->baseUrl/token?token=$token&integrationType=$this->integrationType&domain=$domainName", null);
             $tokenUpsertResponse = json_decode($rawTokenUpsertResponse->responseBody);
             if ($tokenUpsertResponse->status === 'success' && $tokenUpsertResponse->isTokenValidated === true) {
                 $this->setSettingValue('fastcomments_tenant_id', $tokenUpsertResponse->tenantId);
@@ -137,7 +137,8 @@ abstract class FastCommentsIntegrationCore {
     public function integrationStatePollNext() {
         $token = $this->getSettingValue('fastcomments_token');
         $lastFetchDate = $this->getSettingValue('fastcomments_stream_last_fetch_timestamp');
-        $rawIntegrationStreamResponse = $this->makeHTTPRequest('GET', "/commands?token=&fromDateTime={$this->baseUrl}{$token}{($lastFetchDate) ? $lastFetchDate : 0}", null);
+        $lastFetchDateToSend = $lastFetchDate !== null ? $lastFetchDate : 0;
+        $rawIntegrationStreamResponse = $this->makeHTTPRequest('GET', "$this->baseUrl/commands?token=$token&fromDateTime=$lastFetchDateToSend", null);
         $this->log('debug', 'Stream response status: ' . $rawIntegrationStreamResponse->responseStatus);
         if ($rawIntegrationStreamResponse->responseStatus === 200) {
             $response = json_decode($rawIntegrationStreamResponse->responseBody);
@@ -162,7 +163,8 @@ abstract class FastCommentsIntegrationCore {
         $hasMore = true;
         $startedAt = time();
         while ($hasMore && time() - $startedAt < 30 * 1000) {
-            $rawIntegrationEventsResponse = $this->makeHTTPRequest('GET', "/events?token=&fromDateTime={$this->baseUrl}{$token}{($fromDateTime) ? $fromDateTime : 0}", null);
+            $fromDateTimeToSend = $fromDateTime !== null ? $fromDateTime : 0;
+            $rawIntegrationEventsResponse = $this->makeHTTPRequest('GET', "$this->baseUrl/events?token=$token&fromDateTime=$fromDateTimeToSend", null);
             $response = json_decode($rawIntegrationEventsResponse->responseBody);
             if ($response->status === 'success') {
                 $this->log('info', "Got events count: {count($response->events)}");
@@ -193,7 +195,7 @@ abstract class FastCommentsIntegrationCore {
             if ($getCommentsResponse->status === 'success') {
                 $this->log('info', "Got comments to send count=[] hasMore=[]{count($getCommentsResponse->comments)}{$getCommentsResponse->hasMore}");
                 if ($getCommentsResponse->comments && count($getCommentsResponse->comments) > 0) {
-                    $httpResponse = $this->makeHTTPRequest('POST', "/comments?token={$this->baseUrl}{$token}", json_encode(array("countRemaining" => $commentCount - count($getCommentsResponse->comments) + $countSyncedSoFar, "comments" => $getCommentsResponse->comments)));
+                    $httpResponse = $this->makeHTTPRequest('POST', "$this->baseUrl/comments?token=$token", json_encode(array("countRemaining" => $commentCount - count($getCommentsResponse->comments) + $countSyncedSoFar, "comments" => $getCommentsResponse->comments)));
                     $this->log('debug', "Got POST /comments response status code=[]{$httpResponse->responseStatus}");
                     $response = json_decode($httpResponse->responseBody);
                     if ($response->status === 'success') {

@@ -118,14 +118,21 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
 
         curl_setopt($curl, CURLOPT_URL, $url);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+//        curl_setopt($curl, CURLOPT_VERBOSE, true);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
 
         $rawResult = curl_exec($curl);
 
-        curl_close($curl);
-
         $result = new stdClass();
-        $result->responseCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $result->responseCode = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
         $result->responseBody = $rawResult;
+
+        // TODO remove
+        echo "Response URL " . $method . " " . $url . "\n";
+        echo "Response Code " . $result->responseCode . "\n";
+        echo "Response body " . $result->responseBody . "\n";
+
+        curl_close($curl);
 
         return $result;
     }
