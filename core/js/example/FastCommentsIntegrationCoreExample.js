@@ -23,6 +23,7 @@ class TestDB {
     read() {
         if (!fs.existsSync(this.path)) {
             this.data = {};
+            return;
         }
         this.data = JSON.parse(fs.readFileSync(this.path, 'utf8'));
     }
