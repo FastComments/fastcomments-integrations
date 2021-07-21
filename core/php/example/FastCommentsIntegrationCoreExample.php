@@ -1,6 +1,59 @@
 <?php
 
-require '../FastCommentsIntegrationCore.php';
+require(__DIR__ . '/../FastCommentsIntegrationCore.php');
+
+class TestDB {
+    public $name;
+    public $path;
+    private $data;
+
+    public function __construct($name) {
+        $this->name = $name;
+        $this->path = __DIR__ . "/git-ignore-test-db-$name.json";
+        $this->read();
+    }
+
+    public function clear() {
+        $this->data = new stdClass();
+        $this->write();
+    }
+
+    public function write() {
+        $outFile = fopen($this->path, 'w');
+        fwrite($outFile, json_encode($this->data));
+        fclose($outFile);
+    }
+
+    public function read() {
+        if (!file_exists($this->path)) {
+            $this->data = new stdClass();
+            return;
+        }
+        $inFile = fopen($this->path, 'r');
+        $rawFileContents = fread($inFile, filesize($this->path));
+        fclose($inFile);
+        $this->data = json_decode($rawFileContents);
+    }
+
+    public function getData() {
+        return $this->data;
+    }
+
+    public function setValue($name, $value) {
+        $this->data{$name} = $value;
+        $this->write();
+    }
+
+    public function unsetValue($name) {
+        unset($this->data{$name});
+        $this->write();
+    }
+
+    public function getValue($name) {
+        $this->read();
+        return $this->data{$name};
+    }
+}
 
 class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
 
@@ -9,12 +62,22 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
     public $commentDB;
 
     public function __construct() {
-        parent::__construct('test', getenv('FC_HOST'));
+        if (getenv('FC_HOST')) {
+            parent::__construct('test', getenv('FC_HOST'));
+        } else {
+            parent::__construct('test');
+        }
 
         // In the real world, you'd use a database or key value store to store these values.
-        $this->settingDB = array(); // we'll need a place to store the settings
-        $this->fcToOurIds = array(); // we'll need a table, or way to map, the FastComments ids to your ids.
-        $this->commentDB = array(); // we'll need a table to store the comments by id.
+        $this->settingDB = new TestDB('settings'); // we'll need a place to store the settings
+        $this->fcToOurIds = new TestDB('fcToOurIds'); // we'll need a table, or way to map, the FastComments ids to your ids.
+        $this->commentDB = new TestDB('comments'); // we'll need a table to store the comments by id.
+    }
+
+    public function dropDatabase() {
+        $this->settingDB->clear();
+        $this->fcToOurIds->clear();
+        $this->commentDB->clear();
     }
 
     public function activate() {
@@ -31,11 +94,11 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
     }
 
     public function getSettingValue($settingName) {
-        return $this->settingDB[$settingName];
+        return $this->settingDB->getValue($settingName);
     }
 
     public function setSettingValue($settingName, $settingValue) {
-        $this->settingDB[$settingName] = $settingValue;
+        $this->settingDB->setValue($settingName, $settingValue);
     }
 
     public function makeHTTPRequest($method, $url, $body) {
@@ -71,20 +134,20 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
                     case 'new-comment':
                         $ourId = $this->createUUID();
                         $fcId = $eventData->comment->_id;
-                        $this->fcToOurIds[$fcId] = $ourId;
-                        $this->commentDB[$ourId] = $eventData->comment;
+                        $this->fcToOurIds->setValue($fcId, $ourId);
+                        $this->commentDB->setValue($ourId, $eventData->comment);
                         break;
                     case 'updated-comment':
                         $ourId = $this->fcToOurIds[$eventData->comment->_id];
-                        $this->commentDB[$ourId] = $eventData->comment;
+                        $this->commentDB->setValue($ourId, $eventData->comment);
                         break;
                     case 'deleted-comment':
-                        $ourId = $this->fcToOurIds[$eventData->comment->_id];
-                        unset($this->commentDB[$ourId]);
+                        $ourId = $this->fcToOurIds->getValue($eventData->comment->_id);
+                        $this->commentDB->unsetValue($ourId);
                         break;
                     case 'new-vote':
-                        $ourId = $this->fcToOurIds[$eventData->comment->_id];
-                        $ourComment = $this->commentDB[$ourId];
+                        $ourId = $this->fcToOurIds->getValue($eventData->comment->_id);
+                        $ourComment = $this->commentDB->getValue($ourId);
                         if ($eventData->vote->direction > 0) {
                             $ourComment->votes++;
                             $ourComment->votesUp++;
@@ -94,8 +157,8 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
                         }
                         break;
                     case 'deleted-vote':
-                        $ourId = $this->fcToOurIds[$eventData->comment->_id];
-                        $ourComment = $this->commentDB[$ourId];
+                        $ourId = $this->fcToOurIds->getValue($eventData->comment->_id);
+                        $ourComment = $this->commentDB->getValue($ourId);
                         if ($eventData->vote->direction > 0) {
                             $ourComment->votes--;
                             $ourComment->votesUp--;
@@ -112,7 +175,7 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
     }
 
     public function getCommentCount() {
-        return count($this->commentDB);
+        return count($this->commentDB->getData());
     }
 
     public function getComments($startFromDateTime) {
@@ -131,12 +194,47 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
             });
         }
 
-        $comments = getCommentsFrom($this->commentDB, $startFromDateTime);
-        $remainingComments = count($comments) > 0 ? getCommentsFrom($this->commentDB, $comments[count($comments) - 1]->date) : [];
+        $comments = getCommentsFrom($this->commentDB->getData(), $startFromDateTime);
+        $remainingComments = count($comments) > 0 ? getCommentsFrom($this->commentDB->getData(), $comments[count($comments) - 1]->date) : [];
         return array(
             "status" => "success",
             "comments" => $comments,
             "hasMore" => count($remainingComments) > 0
         );
+    }
+}
+
+// Now we create an example "app" and use our example class that manages the integration.
+class FastCommentsCoreExampleUsage {
+    public $fastComments;
+
+    public function __construct() {
+        $this->fastComments = new FastCommentsIntegrationCoreExample();
+    }
+
+    public function createToken() {
+        $hasToken = false;
+        while (!$hasToken) {
+            echo 'Polling for token...';
+            $this->fastComments->tick();
+            $hasToken = !!$this->fastComments->getSettingValue('fastcomments_token');
+            sleep(1);
+        }
+        echo 'Got Token! ' . $this->fastComments->getSettingValue('fastcomments_token');
+    }
+
+    public function waitForTenantId() {
+        $hasTenantId = false;
+        while (!$hasTenantId) {
+            echo 'Polling for tenant id... (set when user accepts token in admin).';
+            $this->fastComments->tick();
+            $hasTenantId = !!$this->fastComments->getSettingValue('fastcomments_tenant_id');
+            sleep(1);
+        }
+        echo 'Got tenant id! ' . $this->fastComments->getSettingValue('fastcomments_tenant_id');
+    }
+
+    public function cron() {
+        $this->fastComments->tick();
     }
 }

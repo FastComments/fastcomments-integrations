@@ -9,13 +9,13 @@ program.parse(process.argv);
 const LIBRARY_TO_TEST = program.opts().library;
 
 if (!LIBRARY_TO_TEST) {
-    throw new Error('Specify a library to test (env LIBRARY_TO_TEST)');
+    throw new Error('Specify a library to test (--library=x)');
 }
 
 const configuration = require('./test-definitions.json').projects[LIBRARY_TO_TEST];
 
 if (!configuration || !configuration.stepCommands || configuration.stepCommands.length === 0) {
-    throw new Error(`Could not find test configuration for LIBRARY_TO_TEST=[${LIBRARY_TO_TEST}].`);
+    throw new Error(`Could not find test configuration for library=[${LIBRARY_TO_TEST}].`);
 }
 
 const CORE_DIR = join(__dirname, '..');
@@ -89,6 +89,9 @@ function runStep(name, inheritIo) {
         runStep('test-step-4-sync-from-remote', true);
     } catch (e) {
         console.error(e);
+        if (e.output) {
+            console.error(e.output.toString());
+        }
         // delete our testing tenant via hitting a safe endpoint
         await page.goto(`${HOST}/test-e2e/api/tenant/delete-current-tenant`);
         process.exit(1);
