@@ -36,7 +36,13 @@ function runStep(name, inheritIo) {
 
 (async function mainTest() {
     const browser = await puppeteer.launch({
-        headless: true
+        headless: true,
+        args: [
+            // TODO fix build pipeline so this isn't needed
+            '--no-sandbox',
+            // TODO fix build pipeline so this isn't needed
+            '--disable-setuid-sandbox',
+        ]
     });
 
     const tenantName = `js-core-integration-test-${Math.random()}`.replace('.', '_');
