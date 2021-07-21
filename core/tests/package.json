@@ -1,0 +1,7 @@
+{
+  "name": "fastcomments-integrations-core-test-harness",
+  "dependencies": {
+    "puppeteer": "^10.1.0",
+    "commander": "^8.0.0"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "projects": {
+    "js-core": {
+      "stepCommands": {
+        "test-step-1-create-token": "node js/tests/test-step-1-create-token.js",
+        "test-step-1-get-token": "node js/tests/test-step-1-get-token.js",
+        "test-step-2-set-tenant-id": "node js/tests/test-step-2-set-tenant-id.js",
+        "test-step-3-sync-to-remote": "node js/tests/test-step-3-sync-to-remote.js",
+        "test-step-4-sync-from-remote": "node js/tests/test-step-4-sync-from-remote.js"
+      }
+    }
+  }
+}

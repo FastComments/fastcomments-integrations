@@ -1,6 +1,51 @@
 const {FastCommentsIntegrationCore} = require('../FastCommentsIntegrationCore');
 const {v4} = require('uuid');
 const axios = require('axios');
+const path = require('path');
+const fs = require('fs');
+
+class TestDB {
+    constructor(name) {
+        this.name = name;
+        this.path = path.join(__dirname, `git-ignore-test-db-${name}.json`);
+        this.read();
+    }
+
+    clear() {
+        this.data = {};
+        this.write();
+    }
+
+    write() {
+        fs.writeFileSync(this.path, JSON.stringify(this.data), 'utf8');
+    }
+
+    read() {
+        if (!fs.existsSync(this.path)) {
+            this.data = {};
+        }
+        this.data = JSON.parse(fs.readFileSync(this.path, 'utf8'));
+    }
+
+    getData() {
+        return this.data;
+    }
+
+    setValue(name, value) {
+        this.data[name] = value;
+        this.write();
+    }
+
+    unsetValue(name) {
+        delete this.data[name];
+        this.write();
+    }
+
+    getValue(name) {
+        this.read();
+        return this.data[name];
+    }
+}
 
 // First we implement FastCommentsIntegrationCore, configuring our storage and other environment specific methods.
 class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
@@ -8,11 +53,16 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
         super('test', process.env.FC_HOST);
 
         // In the real world, you'd use a database or key value store to store these values.
-        this.settingDB = {}; // we'll need a place to store the settings
-        this.fcToOurIds = {}; // we'll need a table, or way to map, the FastComments ids to your ids.
-        this.commentDB = {}; // we'll need a table to store the comments by id.
+        this.settingDB = new TestDB('settings'); // we'll need a place to store the settings
+        this.fcToOurIds = new TestDB('fcToOurIds'); // we'll need a table, or way to map, the FastComments ids to your ids.
+        this.commentDB = new TestDB('comments'); // we'll need a table to store the comments by id.
     }
 
+    dropDatabase() {
+        this.settingDB.clear();
+        this.fcToOurIds.clear();
+        this.commentDB.clear();
+    }
 
     /**
      * @description Activate the integration. Create a table, for example.
@@ -64,7 +114,7 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
      * @return {Promise<string|number|boolean|null|undefined>}
      */
     async getSettingValue(settingName) {
-        return this.settingDB[settingName];
+        return this.settingDB.getValue(settingName);
     }
 
     /**
@@ -74,7 +124,7 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
      * @return {Promise<void>}
      */
     async setSettingValue(settingName, settingValue) {
-        this.settingDB[settingName] = settingValue;
+        this.settingDB.setValue(settingName, settingValue);
     }
 
     /**
@@ -163,20 +213,20 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
                     case 'new-comment':
                         ourId = this.createUUID();
                         fcId = eventData.comment._id;
-                        this.fcToOurIds[fcId] = ourId;
-                        this.commentDB[ourId] = eventData.comment;
+                        this.fcToOurIds.setValue(fcId, ourId);
+                        this.commentDB.setValue(ourId, eventData.comment);
                         break;
                     case 'updated-comment':
-                        ourId = this.fcToOurIds[eventData.comment._id];
-                        this.commentDB[ourId] = eventData.comment;
+                        ourId = this.fcToOurIds.getValue(eventData.comment._id);
+                        this.commentDB.setValue(ourId, eventData.comment);
                         break;
                     case 'deleted-comment':
-                        ourId = this.fcToOurIds[eventData.comment._id];
-                        delete this.commentDB[ourId];
+                        ourId = this.fcToOurIds.getValue(eventData.comment._id);
+                        this.commentDB.unsetValue(ourId);
                         break;
                     case 'new-vote':
-                        ourId = this.fcToOurIds[eventData.comment._id];
-                        ourComment = this.commentDB[ourId];
+                        ourId = this.fcToOurIds.getValue(eventData.comment._id);
+                        ourComment = this.commentDB.getValue(ourId);
                         if (eventData.vote.direction > 0) {
                             ourComment.votes++;
                             ourComment.votesUp++;
@@ -186,8 +236,8 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
                         }
                         break;
                     case 'deleted-vote':
-                        ourId = this.fcToOurIds[eventData.comment._id];
-                        ourComment = this.commentDB[ourId];
+                        ourId = this.fcToOurIds.getValue(eventData.comment._id);
+                        ourComment = this.commentDB.getValue(ourId);
                         if (eventData.vote.direction > 0) {
                             ourComment.votes--;
                             ourComment.votesUp--;
@@ -207,7 +257,7 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
      * @return {Promise<number>}
      */
     async getCommentCount() {
-        return Object.values(this.commentDB).length;
+        return Object.values(this.commentDB.getData()).length;
     }
 
     /**
@@ -230,8 +280,8 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
                 .filter((comment, index) => new Date(comment.date).getTime() >= startFromDateTime);
         }
 
-        const comments = await getCommentsFrom(this.commentDB, startFromDateTime);
-        const remainingComments = comments ? await getCommentsFrom(this.commentDB, comments[comments.length - 1].date) : [];
+        const comments = await getCommentsFrom(this.commentDB.getData(), startFromDateTime);
+        const remainingComments = comments ? await getCommentsFrom(this.commentDB.getData(), comments[comments.length - 1].date) : [];
         return {
             status: 'success',
             comments: comments,
