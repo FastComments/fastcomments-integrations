@@ -211,7 +211,6 @@ abstract class FastCommentsIntegrationCore {
                     $httpResponse = $this->makeHTTPRequest('POST', "$this->baseUrl/comments?token=$token", $requestBody);
                     $this->log('debug', "Got POST /comments response status code=[$httpResponse->responseStatusCode]");
                     $response = json_decode($httpResponse->responseBody);
-                    var_dump($response);
                     if ($response->status === 'success') {
                         $fromDateTime = strtotime($getCommentsResponse['comments'][count($getCommentsResponse['comments']) - 1]['date']) * 1000;
                         $lastSendDate = $fromDateTime;
