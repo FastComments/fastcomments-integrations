@@ -17,6 +17,8 @@ abstract class FastCommentsIntegrationCore {
 
     public abstract function activate();
 
+    public abstract function deactivate();
+
     public abstract function createUUID();
 
     public abstract function getDomain();

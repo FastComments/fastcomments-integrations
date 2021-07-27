@@ -103,11 +103,19 @@ class FastCommentsIntegrationCore {
     }
 
     /**
-     * @description Activate the integration. Create a table, for example.
+     * @description Activate the integration. Create tables, for example.
      * @return {string}
      */
     async activate() {
         throw new Error('Implement me! activate()');
+    }
+
+    /**
+     * @description Deactivate the integration. Remove tables, for example.
+     * @return {string}
+     */
+    async deactivate() {
+        throw new Error('Implement me! deactivate()');
     }
 
     /**

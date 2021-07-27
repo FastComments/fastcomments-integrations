@@ -81,6 +81,10 @@ class FastCommentsIntegrationCoreExample extends FastCommentsIntegrationCore {
         $this->setSettingValue('fastcomments_setup', true);
     }
 
+    public function deactivate() {
+        // In the real world, you might remove some tables here, for example.
+    }
+
     public function createUUID() {
         return uniqid();
     }
