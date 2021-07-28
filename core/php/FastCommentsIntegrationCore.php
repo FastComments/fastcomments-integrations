@@ -142,7 +142,7 @@ abstract class FastCommentsIntegrationCore {
         // The reason this logic is weird is the two things are relatively far from each other, potentially being bug prone.
         $token = $this->getSettingValue('fastcomments_token');
         $lastFetchDate = $this->getSettingValue('fastcomments_stream_last_fetch_timestamp');
-        $lastFetchDateToSend = $lastFetchDate !== null ? $lastFetchDate : 0;
+        $lastFetchDateToSend = $lastFetchDate ? $lastFetchDate : 0;
         $rawIntegrationStreamResponse = $this->makeHTTPRequest('GET', "$this->baseUrl/commands?token=$token&fromDateTime=$lastFetchDateToSend", null);
         $this->log('debug', 'Stream response status: ' . $rawIntegrationStreamResponse->responseStatusCode);
         if ($rawIntegrationStreamResponse->responseStatusCode === 200) {
@@ -168,8 +168,8 @@ abstract class FastCommentsIntegrationCore {
         $hasMore = true;
         $startedAt = time();
         while ($hasMore && time() - $startedAt < 30 * 1000) {
-            $this->log('debug', 'Send events command loop...');
-            $fromDateTimeToSend = $fromDateTime !== null ? $fromDateTime : 0;
+            $this->log('debug', 'Get events command loop...');
+            $fromDateTimeToSend = $fromDateTime ? $fromDateTime : 0;
             $rawIntegrationEventsResponse = $this->makeHTTPRequest('GET', "$this->baseUrl/events?token=$token&fromDateTime=$fromDateTimeToSend", null);
             $response = json_decode($rawIntegrationEventsResponse->responseBody);
             if ($response->status === 'success') {
