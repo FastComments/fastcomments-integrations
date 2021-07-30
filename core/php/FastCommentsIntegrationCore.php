@@ -121,10 +121,10 @@ abstract class FastCommentsIntegrationCore {
 
     public function integrationStateInitial() {
         $tenantId = $this->getSettingValue('fastcomments_tenant_id');
-        if ($tenantId) {
+        $token = $this->getSettingValue('fastcomments_token');
+        if ($tenantId && $token) {
             return 'integrationStatePollNext';
         } else {
-            $token = $this->getSettingValue('fastcomments_token');
             if ($token) {
                 return 'integrationStateValidateToken';
             } else {
@@ -190,7 +190,7 @@ abstract class FastCommentsIntegrationCore {
         $hasMore = true;
         $startedAt = time();
         while ($hasMore && time() - $startedAt < 30 * 1000) {
-            $this->log('debug', 'Get events command loop...');
+            $this->log('debug', 'Send events command loop...');
             $fromDateTimeToSend = $fromDateTime ? $fromDateTime : 0;
             $rawIntegrationEventsResponse = $this->makeHTTPRequest('GET', "$this->baseUrl/events?token=$token&fromDateTime=$fromDateTimeToSend", null);
             $response = json_decode($rawIntegrationEventsResponse->responseBody);
@@ -217,6 +217,19 @@ abstract class FastCommentsIntegrationCore {
         $hasMore = true;
         $countSyncedSoFar = 0;
         $commentCount = $this->getCommentCount();
+        if ($commentCount == 0) {
+            $this->log('debug', 'No comments to send. Telling server.');
+            $requestBody = json_encode(
+                array(
+                    "countRemaining" => 0,
+                    "comments" => array()
+                )
+            );
+            $httpResponse = $this->makeHTTPRequest('POST', "$this->baseUrl/comments?token=$token", $requestBody);
+            $this->log('debug', "Got POST /comments response status code=[$httpResponse->responseStatusCode]");
+            $this->setSetupDone();
+            return;
+        }
         while ($hasMore && time() - $startedAt < 30 * 1000) {
             $this->log('debug', 'Send comments command loop...');
             $getCommentsResponse = $this->getComments($lastSendDate ? $lastSendDate : 0);
@@ -225,7 +238,7 @@ abstract class FastCommentsIntegrationCore {
                 $hasMore = $getCommentsResponse['hasMore'];
                 $this->log('info', "Got comments to send count=[$count] hasMore=[$hasMore]");
                 if ($getCommentsResponse['comments'] && count($getCommentsResponse['comments']) > 0) {
-                    $countRemaining = $commentCount - count($getCommentsResponse['comments']) + $countSyncedSoFar;
+                    $countRemaining = max($commentCount - count($getCommentsResponse['comments']) + $countSyncedSoFar, 0);
                     $requestBody = json_encode(
                         array(
                             "countRemaining" => $countRemaining,
@@ -241,14 +254,12 @@ abstract class FastCommentsIntegrationCore {
                         $this->setSettingValue('fastcomments_stream_last_send_timestamp', $fromDateTime);
                         $countSyncedSoFar += count($getCommentsResponse['comments']);
                         if (!$hasMore) {
-                            $this->setSettingValue('fastcomments_sync_completed', true);
-                            $this->setSettingValue('fastcomments_stream_last_fetch_timestamp', time() * 1000);
+                            $this->setSetupDone();
                             break;
                         }
                     }
                 } else {
-                    $this->setSettingValue('fastcomments_sync_completed', true);
-                    $this->setSettingValue('fastcomments_stream_last_fetch_timestamp', time() * 1000);
+                    $this->setSetupDone();
                     break;
                 }
             } else {
@@ -260,6 +271,11 @@ abstract class FastCommentsIntegrationCore {
             }
         }
         $this->log('debug', 'Done sending comments');
+    }
+
+    private function setSetupDone() {
+        $this->setSettingValue('fastcomments_setup', true);
+        $this->setSettingValue('fastcomments_stream_last_fetch_timestamp', time() * 1000);
     }
 
 }
