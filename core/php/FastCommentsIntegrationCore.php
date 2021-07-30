@@ -93,6 +93,24 @@ abstract class FastCommentsIntegrationCore {
         return $result;
     }
 
+    public function enableSSO() {
+        $token = $this->getSettingValue("fastcomments_token");
+        $apiSecretResponseRaw = $this->makeHTTPRequest('GET', "$this->baseUrl/api-secret?token=$token", null);
+        $this->log('debug', 'Secret Token Fetch Response Code:' . $apiSecretResponseRaw->responseStatusCode);
+        $apiSecretResponse = json_decode($apiSecretResponseRaw->responseBody);
+        if ($apiSecretResponse->status === 'success' && $apiSecretResponse->secret) {
+            $this->setSettingValue('fastcomments_sso_key', $apiSecretResponse->secret);
+            $this->setSettingValue('fastcomments_sso_enabled', true);
+        } else {
+            throw new RuntimeException("API did not return success response when trying to get the key!");
+        }
+    }
+
+    public function disableSSO() {
+        $this->setSettingValue('fastcomments_sso_key', null);
+        $this->setSettingValue('fastcomments_sso_enabled', false);
+    }
+
     public function tick() {
         $nextStateMachineName = 'integrationStateInitial';
         while ($nextStateMachineName) {
