@@ -67,6 +67,6 @@ while(!$isSyncDone) {
         throw new RuntimeException('Sync taking too long!');
     }
     $myApp->cron();
-    $isSyncDone = $myApp->fastComments->getSettingValue('fastcomments_sync_completed');
+    $isSyncDone = $myApp->fastComments->getSettingValue('fastcomments_setup');
     sleep(1);
 }
