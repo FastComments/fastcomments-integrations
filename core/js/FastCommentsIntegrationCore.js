@@ -323,10 +323,11 @@ class FastCommentsIntegrationCore {
 
     async integrationStateInitial() {
         const tenantId = await this.getSettingValue('fastcomments_tenant_id');
-        if (tenantId) {
+        const token = await this.getSettingValue('fastcomments_token');
+        const isTokenValidated = await this.getSettingValue('fastcomments_token_validated');
+        if (tenantId && token && isTokenValidated) {
             return this.integrationStatePollNext;
         } else {
-            const token = await this.getSettingValue('fastcomments_token');
             if (token) {
                 return this.integrationStateValidateToken;
             } else {
@@ -344,9 +345,8 @@ class FastCommentsIntegrationCore {
             const tokenUpsertResponse = JSON.parse(rawTokenUpsertResponse.responseBody);
             if (tokenUpsertResponse.status === 'success' && tokenUpsertResponse.isTokenValidated === true) {
                 await this.setSettingValue('fastcomments_tenant_id', tokenUpsertResponse.tenantId);
+                await this.setSettingValue('fastcomments_token_validated', true);
             }
-            // TODO handle "token does not exist"
-            // TODO handle "token taken"
             return null;
         } else {
             return this.integrationStateCreateToken;
