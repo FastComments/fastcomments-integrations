@@ -122,7 +122,8 @@ abstract class FastCommentsIntegrationCore {
     public function integrationStateInitial() {
         $tenantId = $this->getSettingValue('fastcomments_tenant_id');
         $token = $this->getSettingValue('fastcomments_token');
-        if ($tenantId && $token) {
+        $isTokenValidated = $this->getSettingValue('fastcomments_token_validated');
+        if ($tenantId && $token && $isTokenValidated) {
             return 'integrationStatePollNext';
         } else {
             if ($token) {
@@ -141,6 +142,7 @@ abstract class FastCommentsIntegrationCore {
             $tokenUpsertResponse = json_decode($rawTokenUpsertResponse->responseBody);
             if ($tokenUpsertResponse->status === 'success' && $tokenUpsertResponse->isTokenValidated === true) {
                 $this->setSettingValue('fastcomments_tenant_id', $tokenUpsertResponse->tenantId);
+                $this->setSettingValue('fastcomments_token_validated', true);
             }
             return null;
         } else {
