@@ -159,24 +159,28 @@ abstract class FastCommentsIntegrationCore {
         // This removes the weird logic where each time a command is finished processing, we advance the fastcomments_stream_last_fetch_timestamp.
         // The reason this logic is weird is the two things are relatively far from each other, potentially being bug prone.
         $token = $this->getSettingValue('fastcomments_token');
-        $lastFetchDate = $this->getSettingValue('fastcomments_stream_last_fetch_timestamp');
-        $lastFetchDateToSend = $lastFetchDate ? $lastFetchDate : 0;
-        $rawIntegrationStreamResponse = $this->makeHTTPRequest('GET', "$this->baseUrl/commands?token=$token&fromDateTime=$lastFetchDateToSend", null);
-        $this->log('debug', 'Stream response status: ' . $rawIntegrationStreamResponse->responseStatusCode);
-        if ($rawIntegrationStreamResponse->responseStatusCode === 200) {
-            $response = json_decode($rawIntegrationStreamResponse->responseBody);
-            if ($response->status === 'success' && $response->commands) {
-                foreach ($response->commands as $command) {
-                    switch ($command->command) {
-                        case 'FetchEvents':
-                            $this->commandFetchEvents($token);
-                            break;
-                        case 'SendComments':
-                            $this->commandSendComments($token);
-                            break;
+        if ($token) {
+            $lastFetchDate = $this->getSettingValue('fastcomments_stream_last_fetch_timestamp');
+            $lastFetchDateToSend = $lastFetchDate ? $lastFetchDate : 0;
+            $rawIntegrationStreamResponse = $this->makeHTTPRequest('GET', "$this->baseUrl/commands?token=$token&fromDateTime=$lastFetchDateToSend", null);
+            $this->log('debug', 'Stream response status: ' . $rawIntegrationStreamResponse->responseStatusCode);
+            if ($rawIntegrationStreamResponse->responseStatusCode === 200) {
+                $response = json_decode($rawIntegrationStreamResponse->responseBody);
+                if ($response->status === 'success' && $response->commands) {
+                    foreach ($response->commands as $command) {
+                        switch ($command->command) {
+                            case 'FetchEvents':
+                                $this->commandFetchEvents($token);
+                                break;
+                            case 'SendComments':
+                                $this->commandSendComments($token);
+                                break;
+                        }
                     }
                 }
             }
+        } else {
+            $this->log('error', "Cannot fetch commands, fastcomments_token not set.");
         }
         return null;
     }
