@@ -217,7 +217,7 @@ abstract class FastCommentsIntegrationCore {
         $lastSendDate = $this->getSettingValue('fastcomments_stream_last_send_timestamp');
         $startedAt = time();
         $hasMore = true;
-        $countSyncedSoFar = 0;
+        $countSyncedSoFar = $this->getSettingValue('fastcomments_comment_sent_count') ? $this->getSettingValue('fastcomments_comment_sent_count') : 0;
         $commentCount = $this->getCommentCount();
         if ($commentCount == 0) {
             $this->log('debug', 'No comments to send. Telling server.');
@@ -240,7 +240,7 @@ abstract class FastCommentsIntegrationCore {
                 $hasMore = $getCommentsResponse['hasMore'];
                 $this->log('info', "Got comments to send count=[$count] hasMore=[$hasMore]");
                 if ($getCommentsResponse['comments'] && count($getCommentsResponse['comments']) > 0) {
-                    $countRemaining = max($commentCount - count($getCommentsResponse['comments']) + $countSyncedSoFar, 0);
+                    $countRemaining = max($commentCount - (count($getCommentsResponse['comments']) + $countSyncedSoFar), 0);
                     $requestBody = json_encode(
                         array(
                             "countRemaining" => $countRemaining,
@@ -255,6 +255,7 @@ abstract class FastCommentsIntegrationCore {
                         $lastSendDate = $fromDateTime;
                         $this->setSettingValue('fastcomments_stream_last_send_timestamp', $fromDateTime);
                         $countSyncedSoFar += count($getCommentsResponse['comments']);
+                        $this->setSettingValue('fastcomments_comment_sent_count', $countSyncedSoFar);
                         if (!$hasMore) {
                             $this->setSetupDone();
                             break;
