@@ -112,11 +112,13 @@ abstract class FastCommentsIntegrationCore {
     }
 
     public function tick() {
+        $this->log('debug', "BEGIN Tick");
         $nextStateMachineName = 'integrationStateInitial';
         while ($nextStateMachineName) {
             $this->log('debug', 'Next state machine:' . $nextStateMachineName);
             $nextStateMachineName = call_user_func(array($this, $nextStateMachineName));
         }
+        $this->log('debug', "END Tick");
     }
 
     public function integrationStateInitial() {
@@ -170,6 +172,7 @@ abstract class FastCommentsIntegrationCore {
                 $response = json_decode($rawIntegrationStreamResponse->responseBody);
                 if ($response->status === 'success' && $response->commands) {
                     foreach ($response->commands as $command) {
+                        $this->log('debug', "Processing command $command->command");
                         switch ($command->command) {
                             case 'FetchEvents':
                                 $this->commandFetchEvents($token);
