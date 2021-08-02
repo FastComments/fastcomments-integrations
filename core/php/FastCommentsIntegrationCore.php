@@ -256,7 +256,7 @@ abstract class FastCommentsIntegrationCore {
                         $this->setSettingValue('fastcomments_stream_last_send_timestamp', $fromDateTime);
                         $countSyncedSoFar += count($getCommentsResponse['comments']);
                         $this->setSettingValue('fastcomments_comment_sent_count', $countSyncedSoFar);
-                        if (!$hasMore) {
+                        if (!$hasMore || $countRemaining === 0) {
                             $this->setSetupDone();
                             break;
                         }
