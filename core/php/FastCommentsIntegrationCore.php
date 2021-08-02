@@ -215,8 +215,32 @@ abstract class FastCommentsIntegrationCore {
         }
     }
 
+    private function canAckLock($name, $window) {
+        $settingName = $this->getLockName($name);
+        $lastTime = $this->getSettingValue($settingName);
+        $now = time();
+        if ($lastTime && $now - $lastTime < $window) {
+            return false;
+        }
+        $this->setSettingValue($settingName, $now);
+        return true;
+    }
+
+    private function getLockName($name) {
+        return "lock_$name";
+    }
+
+    private function clearLock($name) {
+        $settingName = $this->getLockName($name);
+        $this->setSettingValue($settingName, null);
+    }
+
     public function commandSendComments($token) {
         $this->log('debug', 'Starting to send comments');
+        if (!$this->canAckLock("commandSendComments", 3000)) {
+            $this->log('debug', 'Can not send right now, waiting for previous attempt to finish.');
+            return;
+        }
         $lastSendDate = $this->getSettingValue('fastcomments_stream_last_send_timestamp');
         $startedAt = time();
         $hasMore = true;
@@ -282,6 +306,7 @@ abstract class FastCommentsIntegrationCore {
     private function setSetupDone() {
         $this->setSettingValue('fastcomments_setup', true);
         $this->setSettingValue('fastcomments_stream_last_fetch_timestamp', time() * 1000);
+        $this->clearLock("commandSendComments");
     }
 
 }
