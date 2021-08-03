@@ -102,6 +102,7 @@ abstract class FastCommentsIntegrationCore {
             $this->setSettingValue('fastcomments_sso_key', $apiSecretResponse->secret);
             $this->setSettingValue('fastcomments_sso_enabled', true);
         } else {
+            $this->log('error', $apiSecretResponse->reason);
             throw new RuntimeException("API did not return success response when trying to get the key!");
         }
     }
