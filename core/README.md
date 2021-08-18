@@ -66,7 +66,7 @@ When the client receives a `SendComments` command, it should paginate through al
 The request body should contain a `comments` array, and a `countRemaining` count. When this is zero, the `SendComments` command will disappear from the command stream
 until the user requests a sync again. Look at the example integrations for further details on the structures.
 
-When sending comments to FastComments.com, ensure that the *child comments* are sent first, walking up to the parents.
+When sending comments to FastComments.com, ensure that the *parent comments* are sent first.
 
 ### Protocol - Event Log
 
